@@ -1,0 +1,7 @@
+void HelloWorld() {
+    stdiox.printf("Hello, World!");
+}
+
+schedule {
+    run HelloWorld;
+}

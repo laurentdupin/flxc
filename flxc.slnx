@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Flx.Compiler/Flx.Compiler.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,10 @@
+import c "stdio.h" as stdio
+
+void HelloWorld() {
+    stdio.printf("A");
+    stdio.printf("B");
+}
+
+schedule {
+    run HelloWorld;
+}

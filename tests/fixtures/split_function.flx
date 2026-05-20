@@ -1,0 +1,5 @@
+import c "stdio.h" as stdio
+
+void HelloWorld() {
+    stdio.printf("Hello, World!");
+}

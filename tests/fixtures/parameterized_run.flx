@@ -1,0 +1,9 @@
+void HelloWorld() {
+}
+
+void HelloWorld(Zombie z) {
+}
+
+schedule {
+    run HelloWorld;
+}
