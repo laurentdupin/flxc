@@ -4,18 +4,58 @@
   "description": "Syntax highlighting and basic editor support for FLX.",
   "version": "0.0.1",
   "publisher": "flx",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:flx"
+  ],
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "publish:server": "dotnet publish ../../../src/Flx.LanguageServer/Flx.LanguageServer.csproj -c Release -o server",
+    "package": "npm run publish:server && vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.0.0",
+    "vsce": "^1.97.0"
+  },
   "contributes": {
+    "configuration": {
+      "title": "FLX",
+      "properties": {
+        "flx.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to flx-lsp. If empty, the extension tries common repo-local paths and PATH."
+        },
+        "flx.languageServer.log": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path for flx-lsp log output."
+        }
+      }
+    },
     "languages": [
       {
         "id": "flx",
-        "aliases": ["FLX", "flx"],
-        "extensions": [".flx"],
+        "aliases": [
+          "FLX",
+          "flx"
+        ],
+        "extensions": [
+          ".flx"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],

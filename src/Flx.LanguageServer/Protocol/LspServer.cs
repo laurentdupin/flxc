@@ -114,6 +114,10 @@ internal sealed class LspServer
                     await HandleDocumentSymbolAsync(connection, id.Value, ReadParams<DocumentSymbolParams>(root), cancellationToken);
                 return false;
 
+            case "workspace/didChangeWatchedFiles":
+                await HandleDidChangeWatchedFilesAsync(connection, cancellationToken);
+                return false;
+
             default:
                 if (id is not null)
                     await SendErrorAsync(connection, id.Value, LspErrorCodes.MethodNotFound, "Method not found", cancellationToken);
@@ -176,6 +180,15 @@ internal sealed class LspServer
 
         await LogAsync($"documentSymbol {path}: {symbols.Length}");
         await SendResultAsync(connection, id, symbols, cancellationToken);
+    }
+
+    private async Task HandleDidChangeWatchedFilesAsync(
+        LspConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await LogAsync("didChangeWatchedFiles");
+        foreach (var document in _openDocumentsByPath.Values.ToArray())
+            await AnalyzeAndPublishDiagnosticsAsync(connection, document.Path, cancellationToken);
     }
 
     private async Task AnalyzeAndPublishDiagnosticsAsync(
