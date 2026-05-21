@@ -1,0 +1,6 @@
+module game.main;
+
+schedule {
+    run CreateZombies;
+    run SayHello;
+}

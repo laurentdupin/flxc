@@ -97,9 +97,9 @@ internal sealed class CMainGenerator
     private static IEnumerable<FunctionSymbol> ResolveRun(CompilationModel model, RunStepSyntax step)
     {
         return model.FunctionRegistry
-            .LookupSourceName(step.Name)
+            .ResolveFunctionGroup(step.Name, model.ScheduleModule, out _)
             .Where(function => function.Parameters.Count == 0 ||
-                               (function.Parameters.Count == 1 && model.PrefabsByName.ContainsKey(function.Parameters[0].Type)))
+                               (function.Parameters.Count == 1 && model.PrefabsByFullName.ContainsKey(function.Parameters[0].Type)))
             .OrderBy(function => function.SourceFile.DisplayPath, StringComparer.Ordinal)
             .ThenBy(function => function.Location.Line)
             .ThenBy(function => function.MangledName, StringComparer.Ordinal);

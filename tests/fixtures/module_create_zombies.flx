@@ -1,0 +1,10 @@
+module game.create;
+
+void CreateZombies() {
+    Array<string> names = ["Marcus", "Henry"];
+
+    for (usize i = 0; i < names.length(); ++i) {
+        Zombie z = create Zombie;
+        z.name = names[i];
+    }
+}

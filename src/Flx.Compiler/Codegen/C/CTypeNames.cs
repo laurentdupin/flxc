@@ -40,6 +40,9 @@ internal static class CTypeNames
         if (sourceType == "void")
             return "void";
 
+        if (model is not null && model.PrefabsByFullName.ContainsKey(sourceType))
+            return ViewType(sourceType);
+
         var dotIndex = sourceType.IndexOf('.', StringComparison.Ordinal);
         if (dotIndex > 0)
         {
@@ -50,9 +53,6 @@ internal static class CTypeNames
 
             return sourceType;
         }
-
-        if (model is not null && model.PrefabsByName.ContainsKey(sourceType))
-            return ViewType(sourceType);
 
         return sourceType;
     }

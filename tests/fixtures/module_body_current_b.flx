@@ -1,0 +1,7 @@
+module body.b;
+
+import c "stdio.h" as stdio
+
+void Helper() {
+    stdio.printf("body b\n");
+}

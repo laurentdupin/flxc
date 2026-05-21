@@ -35,7 +35,8 @@ internal static class CBodyRewriter
         SourceFile source,
         int bodyStart,
         DiagnosticBag? diagnostics = null,
-        FunctionRegistry? functionRegistry = null)
+        FunctionRegistry? functionRegistry = null,
+        ModuleSymbol? currentModule = null)
     {
         var output = new StringBuilder(body.Length);
         var position = 0;
@@ -70,7 +71,7 @@ internal static class CBodyRewriter
 
             if (Lexer.IsIdentifierStart(current))
             {
-                if (TryRewriteIdentifier(body, output, ref position, importsByAlias, source, bodyStart, diagnostics, functionRegistry))
+                if (TryRewriteIdentifier(body, output, ref position, importsByAlias, source, bodyStart, diagnostics, functionRegistry, currentModule))
                     continue;
             }
 
@@ -144,7 +145,8 @@ internal static class CBodyRewriter
         SourceFile source,
         int bodyStart,
         DiagnosticBag? diagnostics,
-        FunctionRegistry? functionRegistry)
+        FunctionRegistry? functionRegistry,
+        ModuleSymbol? currentModule)
     {
         var identifierStart = position;
         var identifierEnd = ReadIdentifier(body, identifierStart);
@@ -204,7 +206,7 @@ internal static class CBodyRewriter
 
         if (functionRegistry is not null)
         {
-            var matches = functionRegistry.LookupSourceName(identifier);
+            var matches = functionRegistry.ResolveFunctionGroup(identifier, currentModule, out _);
             if (matches.Count == 1)
             {
                 output.Append(matches[0].MangledName);

@@ -50,17 +50,19 @@ internal sealed class ComponentFieldSymbol
 
 internal sealed class ComponentSymbol
 {
-    public ComponentSymbol(SourceFile sourceFile, ComponentDeclSyntax syntax, string name, IReadOnlyList<ComponentFieldSymbol> fields)
+    public ComponentSymbol(SourceFile sourceFile, ComponentDeclSyntax syntax, string name, string fullName, IReadOnlyList<ComponentFieldSymbol> fields)
     {
         SourceFile = sourceFile;
         Syntax = syntax;
         Name = name;
+        FullName = fullName;
         Fields = fields;
     }
 
     public SourceFile SourceFile { get; }
     public ComponentDeclSyntax Syntax { get; }
     public string Name { get; }
+    public string FullName { get; }
     public IReadOnlyList<ComponentFieldSymbol> Fields { get; }
 }
 
@@ -78,17 +80,19 @@ internal sealed class PrefabFieldSymbol
 
 internal sealed class PrefabSymbol
 {
-    public PrefabSymbol(SourceFile sourceFile, PrefabDeclSyntax syntax, string name, IReadOnlyList<ComponentSymbol> flattenedComponents)
+    public PrefabSymbol(SourceFile sourceFile, PrefabDeclSyntax syntax, string name, string fullName, IReadOnlyList<ComponentSymbol> flattenedComponents)
     {
         SourceFile = sourceFile;
         Syntax = syntax;
         Name = name;
+        FullName = fullName;
         FlattenedComponents = flattenedComponents;
     }
 
     public SourceFile SourceFile { get; }
     public PrefabDeclSyntax Syntax { get; }
     public string Name { get; }
+    public string FullName { get; }
     public IReadOnlyList<ComponentSymbol> FlattenedComponents { get; }
 
     public IEnumerable<PrefabFieldSymbol> Fields =>
@@ -102,6 +106,7 @@ internal sealed class FunctionSymbol
         SourceFile sourceFile,
         FunctionDeclSyntax syntax,
         string sourceName,
+        string fullName,
         string mangledName,
         string returnType,
         IReadOnlyList<ParameterSymbol> parameters,
@@ -111,6 +116,7 @@ internal sealed class FunctionSymbol
         SourceFile = sourceFile;
         Syntax = syntax;
         SourceName = sourceName;
+        FullName = fullName;
         MangledName = mangledName;
         ReturnType = returnType;
         Parameters = parameters;
@@ -121,6 +127,7 @@ internal sealed class FunctionSymbol
     public SourceFile SourceFile { get; }
     public FunctionDeclSyntax Syntax { get; }
     public string SourceName { get; }
+    public string FullName { get; }
     public string MangledName { get; }
     public string ReturnType { get; }
     public IReadOnlyList<ParameterSymbol> Parameters { get; }
@@ -136,6 +143,7 @@ internal sealed class GlobalVariableSymbol
         GlobalVariableDeclSyntax syntax,
         string type,
         string name,
+        string fullName,
         string? initializer,
         SourceLocation location)
     {
@@ -144,6 +152,7 @@ internal sealed class GlobalVariableSymbol
         Syntax = syntax;
         Type = type;
         Name = name;
+        FullName = fullName;
         Initializer = initializer;
         Location = location;
     }
@@ -153,6 +162,7 @@ internal sealed class GlobalVariableSymbol
     public GlobalVariableDeclSyntax Syntax { get; }
     public string Type { get; }
     public string Name { get; }
+    public string FullName { get; }
     public string? Initializer { get; }
     public SourceLocation Location { get; }
 }
@@ -163,10 +173,13 @@ internal sealed class ModuleSymbol
     {
         SourceFile = sourceFile;
         Syntax = syntax;
+        Name = syntax.Module?.Name ?? "";
     }
 
     public SourceFile SourceFile { get; }
     public CompilationUnitSyntax Syntax { get; }
+    public string Name { get; }
+    public bool IsRoot => Name.Length == 0;
     public List<CImportSymbol> CImports { get; } = [];
     public Dictionary<string, CImportSymbol> CImportsByAlias { get; } = new(StringComparer.Ordinal);
     public List<ComponentSymbol> Components { get; } = [];
@@ -179,18 +192,24 @@ internal sealed class CompilationModel
 {
     public List<ModuleSymbol> Modules { get; } = [];
     public FunctionRegistry FunctionRegistry { get; } = new();
-    public Dictionary<string, GlobalVariableSymbol> GlobalsByName { get; } = new(StringComparer.Ordinal);
-    public Dictionary<string, ComponentSymbol> ComponentsByName { get; } = new(StringComparer.Ordinal);
-    public Dictionary<string, PrefabSymbol> PrefabsByName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, GlobalVariableSymbol> GlobalsByFullName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<GlobalVariableSymbol>> GlobalsByShortName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, ComponentSymbol> ComponentsByFullName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<ComponentSymbol>> ComponentsByShortName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, PrefabSymbol> PrefabsByFullName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<PrefabSymbol>> PrefabsByShortName { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
     public ScheduleDeclSyntax? Schedule => Schedules.Count == 1 ? Schedules[0] : null;
+    public ModuleSymbol? ScheduleModule => Schedule is null
+        ? null
+        : Modules.FirstOrDefault(module => module.Syntax.Schedules.Contains(Schedule));
     public bool RequiresProgramArguments => FunctionRegistry.AllFunctions.Any(function =>
         ContainsProgramArgumentReference(function.Syntax.BodyText));
-    public bool RequiresRuntime => ComponentsByName.Count > 0 ||
-                                   PrefabsByName.Count > 0 ||
+    public bool RequiresRuntime => ComponentsByFullName.Count > 0 ||
+                                   PrefabsByFullName.Count > 0 ||
                                    RequiresProgramArguments ||
                                    FunctionRegistry.AllFunctions.Any(function => function.NeedsWorld ||
-                                       function.Parameters.Any(parameter => PrefabsByName.ContainsKey(parameter.Type)) ||
+                                       function.Parameters.Any(parameter => PrefabsByFullName.ContainsKey(parameter.Type)) ||
                                        function.Syntax.BodyText.Contains("string", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("Array<", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("i32 ", StringComparison.Ordinal) ||
@@ -201,5 +220,58 @@ internal sealed class CompilationModel
     private static bool ContainsProgramArgumentReference(string text)
     {
         return Regex.IsMatch(text, @"\b(argc|argv)\b");
+    }
+
+    public static string Qualify(string moduleName, string shortName)
+    {
+        return string.IsNullOrWhiteSpace(moduleName) ? shortName : moduleName + "." + shortName;
+    }
+
+    public ComponentSymbol? ResolveComponent(string name, ModuleSymbol module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return ComponentsByFullName.TryGetValue(name, out var qualified) ? qualified : null;
+
+        var currentFullName = Qualify(module.Name, name);
+        if (ComponentsByFullName.TryGetValue(currentFullName, out var current))
+            return current;
+
+        return ComponentsByShortName.TryGetValue(name, out var matches) && matches.Count == 1 ? matches[0] : null;
+    }
+
+    public bool IsAmbiguousComponentName(string name, ModuleSymbol module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return false;
+
+        var currentFullName = Qualify(module.Name, name);
+        if (ComponentsByFullName.ContainsKey(currentFullName))
+            return false;
+
+        return ComponentsByShortName.TryGetValue(name, out var matches) && matches.Count > 1;
+    }
+
+    public PrefabSymbol? ResolvePrefab(string name, ModuleSymbol module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return PrefabsByFullName.TryGetValue(name, out var qualified) ? qualified : null;
+
+        var currentFullName = Qualify(module.Name, name);
+        if (PrefabsByFullName.TryGetValue(currentFullName, out var current))
+            return current;
+
+        return PrefabsByShortName.TryGetValue(name, out var matches) && matches.Count == 1 ? matches[0] : null;
+    }
+
+    public bool IsAmbiguousPrefabName(string name, ModuleSymbol module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return false;
+
+        var currentFullName = Qualify(module.Name, name);
+        if (PrefabsByFullName.ContainsKey(currentFullName))
+            return false;
+
+        return PrefabsByShortName.TryGetValue(name, out var matches) && matches.Count > 1;
     }
 }

@@ -21,10 +21,12 @@ internal static class MetadataWriter
         var metadata = new ModuleMetadata
         {
             Source = module.SourceFile.DisplayPath,
+            Module = module.Name,
             CFile = Path.GetFileName(cFilePath),
             Functions = module.Functions.Select(function => new FunctionMetadata
             {
                 SourceName = function.SourceName,
+                FullName = function.FullName,
                 MangledName = function.MangledName,
                 ReturnType = function.ReturnType,
                 Parameters = function.Parameters.Select(parameter => new ParameterMetadata
@@ -43,6 +45,7 @@ internal static class MetadataWriter
             Components = module.Components.Select(component => new ComponentMetadata
             {
                 Name = component.Name,
+                FullName = component.FullName,
                 Fields = component.Fields.Select(field => new ComponentFieldMetadata
                 {
                     Type = field.Type,
@@ -53,7 +56,8 @@ internal static class MetadataWriter
             Prefabs = module.Prefabs.Select(prefab => new PrefabMetadata
             {
                 Name = prefab.Name,
-                FlattenedComponents = prefab.FlattenedComponents.Select(component => component.Name).ToList()
+                FullName = prefab.FullName,
+                FlattenedComponents = prefab.FlattenedComponents.Select(component => component.FullName).ToList()
             }).ToList()
         };
 

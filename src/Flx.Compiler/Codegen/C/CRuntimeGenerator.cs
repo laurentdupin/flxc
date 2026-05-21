@@ -49,48 +49,48 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine("void flx_array_string_destroy_borrowed(flx_array_string *a);");
         builder.AppendLine();
 
-        foreach (var component in model.ComponentsByName.Values.OrderBy(component => component.Name, StringComparer.Ordinal))
+        foreach (var component in model.ComponentsByFullName.Values.OrderBy(component => component.FullName, StringComparer.Ordinal))
         {
-            builder.AppendLine($"typedef struct {CTypeNames.ComponentType(component.Name)} {{");
+            builder.AppendLine($"typedef struct {CTypeNames.ComponentType(component.FullName)} {{");
             foreach (var field in component.Fields)
                 builder.AppendLine($"    {CTypeNames.MapType(field.Type, model)} {field.Name};");
-            builder.AppendLine($"}} {CTypeNames.ComponentType(component.Name)};");
+            builder.AppendLine($"}} {CTypeNames.ComponentType(component.FullName)};");
             builder.AppendLine();
         }
 
-        foreach (var prefab in model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal))
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
         {
-            builder.AppendLine($"typedef struct {CTypeNames.PrefabType(prefab.Name)} {{");
+            builder.AppendLine($"typedef struct {CTypeNames.PrefabType(prefab.FullName)} {{");
             builder.AppendLine("    usize id;");
             foreach (var component in prefab.FlattenedComponents)
-                builder.AppendLine($"    {CTypeNames.ComponentType(component.Name)} {CTypeNames.SafeIdentifier(component.Name)};");
-            builder.AppendLine($"}} {CTypeNames.PrefabType(prefab.Name)};");
+                builder.AppendLine($"    {CTypeNames.ComponentType(component.FullName)} {CTypeNames.SafeIdentifier(component.FullName)};");
+            builder.AppendLine($"}} {CTypeNames.PrefabType(prefab.FullName)};");
             builder.AppendLine();
-            builder.AppendLine($"typedef struct {CTypeNames.ViewType(prefab.Name)} {{");
-            builder.AppendLine($"    {CTypeNames.PrefabType(prefab.Name)} *ptr;");
-            builder.AppendLine($"}} {CTypeNames.ViewType(prefab.Name)};");
+            builder.AppendLine($"typedef struct {CTypeNames.ViewType(prefab.FullName)} {{");
+            builder.AppendLine($"    {CTypeNames.PrefabType(prefab.FullName)} *ptr;");
+            builder.AppendLine($"}} {CTypeNames.ViewType(prefab.FullName)};");
             builder.AppendLine();
         }
 
         builder.AppendLine("typedef struct flx_world {");
-        var prefabs = model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal).ToArray();
+        var prefabs = model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal).ToArray();
         if (prefabs.Length == 0)
             builder.AppendLine("    int _unused;");
         foreach (var prefab in prefabs)
         {
-            builder.AppendLine($"    {CTypeNames.PrefabType(prefab.Name)} *{CTypeNames.StorageField(prefab.Name)};");
-            builder.AppendLine($"    usize {CTypeNames.CountField(prefab.Name)};");
-            builder.AppendLine($"    usize {CTypeNames.CapacityField(prefab.Name)};");
+            builder.AppendLine($"    {CTypeNames.PrefabType(prefab.FullName)} *{CTypeNames.StorageField(prefab.FullName)};");
+            builder.AppendLine($"    usize {CTypeNames.CountField(prefab.FullName)};");
+            builder.AppendLine($"    usize {CTypeNames.CapacityField(prefab.FullName)};");
         }
         builder.AppendLine("} flx_world;");
         builder.AppendLine();
         builder.AppendLine("void flx_world_init(flx_world *world);");
         builder.AppendLine("void flx_world_destroy(flx_world *world);");
 
-        foreach (var prefab in model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal))
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
         {
-            builder.AppendLine($"{CTypeNames.ViewType(prefab.Name)} {CTypeNames.CreateFunction(prefab.Name)}(flx_world *world);");
-            builder.AppendLine($"{CTypeNames.ViewType(prefab.Name)} {CTypeNames.GetFunction(prefab.Name)}(flx_world *world, usize index);");
+            builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.CreateFunction(prefab.FullName)}(flx_world *world);");
+            builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.GetFunction(prefab.FullName)}(flx_world *world, usize index);");
         }
 
         builder.AppendLine();
@@ -204,30 +204,30 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine("}");
         builder.AppendLine();
         builder.AppendLine("void flx_world_init(flx_world *world) {");
-        foreach (var prefab in model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal))
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
         {
-            builder.AppendLine($"    world->{CTypeNames.StorageField(prefab.Name)} = NULL;");
-            builder.AppendLine($"    world->{CTypeNames.CountField(prefab.Name)} = 0;");
-            builder.AppendLine($"    world->{CTypeNames.CapacityField(prefab.Name)} = 0;");
+            builder.AppendLine($"    world->{CTypeNames.StorageField(prefab.FullName)} = NULL;");
+            builder.AppendLine($"    world->{CTypeNames.CountField(prefab.FullName)} = 0;");
+            builder.AppendLine($"    world->{CTypeNames.CapacityField(prefab.FullName)} = 0;");
         }
         builder.AppendLine("}");
         builder.AppendLine();
         builder.AppendLine("void flx_world_destroy(flx_world *world) {");
-        foreach (var prefab in model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal))
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
         {
-            builder.AppendLine($"    for (usize i = 0; i < world->{CTypeNames.CountField(prefab.Name)}; ++i) {{");
+            builder.AppendLine($"    for (usize i = 0; i < world->{CTypeNames.CountField(prefab.FullName)}; ++i) {{");
             foreach (var component in prefab.FlattenedComponents)
             {
                 foreach (var field in component.Fields.Where(field => field.Type == "string"))
-                    builder.AppendLine($"        flx_string_destroy(&world->{CTypeNames.StorageField(prefab.Name)}[i].{CTypeNames.SafeIdentifier(component.Name)}.{field.Name});");
+                    builder.AppendLine($"        flx_string_destroy(&world->{CTypeNames.StorageField(prefab.FullName)}[i].{CTypeNames.SafeIdentifier(component.FullName)}.{field.Name});");
             }
             builder.AppendLine("    }");
-            builder.AppendLine($"    free(world->{CTypeNames.StorageField(prefab.Name)});");
+            builder.AppendLine($"    free(world->{CTypeNames.StorageField(prefab.FullName)});");
         }
         builder.AppendLine("}");
         builder.AppendLine();
 
-        foreach (var prefab in model.PrefabsByName.Values.OrderBy(prefab => prefab.Name, StringComparer.Ordinal))
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
             AppendPrefabFunctions(builder, prefab);
 
         return builder.ToString();
@@ -235,34 +235,34 @@ internal sealed class CRuntimeGenerator
 
     private static void AppendPrefabFunctions(StringBuilder builder, PrefabSymbol prefab)
     {
-        builder.AppendLine($"{CTypeNames.ViewType(prefab.Name)} {CTypeNames.CreateFunction(prefab.Name)}(flx_world *world) {{");
-        builder.AppendLine($"    if (world->{CTypeNames.CountField(prefab.Name)} == world->{CTypeNames.CapacityField(prefab.Name)}) {{");
-        builder.AppendLine($"        usize next = world->{CTypeNames.CapacityField(prefab.Name)} == 0 ? 8 : world->{CTypeNames.CapacityField(prefab.Name)} * 2;");
-        builder.AppendLine($"        {CTypeNames.PrefabType(prefab.Name)} *items = ({CTypeNames.PrefabType(prefab.Name)} *)realloc(world->{CTypeNames.StorageField(prefab.Name)}, next * sizeof({CTypeNames.PrefabType(prefab.Name)}));");
+        builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.CreateFunction(prefab.FullName)}(flx_world *world) {{");
+        builder.AppendLine($"    if (world->{CTypeNames.CountField(prefab.FullName)} == world->{CTypeNames.CapacityField(prefab.FullName)}) {{");
+        builder.AppendLine($"        usize next = world->{CTypeNames.CapacityField(prefab.FullName)} == 0 ? 8 : world->{CTypeNames.CapacityField(prefab.FullName)} * 2;");
+        builder.AppendLine($"        {CTypeNames.PrefabType(prefab.FullName)} *items = ({CTypeNames.PrefabType(prefab.FullName)} *)realloc(world->{CTypeNames.StorageField(prefab.FullName)}, next * sizeof({CTypeNames.PrefabType(prefab.FullName)}));");
         builder.AppendLine("        if (items == NULL) abort();");
-        builder.AppendLine($"        world->{CTypeNames.StorageField(prefab.Name)} = items;");
-        builder.AppendLine($"        world->{CTypeNames.CapacityField(prefab.Name)} = next;");
+        builder.AppendLine($"        world->{CTypeNames.StorageField(prefab.FullName)} = items;");
+        builder.AppendLine($"        world->{CTypeNames.CapacityField(prefab.FullName)} = next;");
         builder.AppendLine("    }");
-        builder.AppendLine($"    {CTypeNames.PrefabType(prefab.Name)} *item = &world->{CTypeNames.StorageField(prefab.Name)}[world->{CTypeNames.CountField(prefab.Name)}];");
-        builder.AppendLine($"    item->id = world->{CTypeNames.CountField(prefab.Name)} + 1;");
+        builder.AppendLine($"    {CTypeNames.PrefabType(prefab.FullName)} *item = &world->{CTypeNames.StorageField(prefab.FullName)}[world->{CTypeNames.CountField(prefab.FullName)}];");
+        builder.AppendLine($"    item->id = world->{CTypeNames.CountField(prefab.FullName)} + 1;");
         foreach (var component in prefab.FlattenedComponents)
         {
             foreach (var field in component.Fields.Where(field => field.Type == "string"))
             {
                 if (field.DefaultValue is { } defaultValue)
-                    builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.Name)}.{field.Name} = flx_string_from_static({defaultValue}, {StringLiteralLength(defaultValue)});");
+                    builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.FullName)}.{field.Name} = flx_string_from_static({defaultValue}, {StringLiteralLength(defaultValue)});");
                 else
-                    builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.Name)}.{field.Name} = flx_string_empty();");
+                    builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.FullName)}.{field.Name} = flx_string_empty();");
             }
         }
-        builder.AppendLine($"    world->{CTypeNames.CountField(prefab.Name)}++;");
-        builder.AppendLine($"    {CTypeNames.ViewType(prefab.Name)} view = {{ item }};");
+        builder.AppendLine($"    world->{CTypeNames.CountField(prefab.FullName)}++;");
+        builder.AppendLine($"    {CTypeNames.ViewType(prefab.FullName)} view = {{ item }};");
         builder.AppendLine("    return view;");
         builder.AppendLine("}");
         builder.AppendLine();
-        builder.AppendLine($"{CTypeNames.ViewType(prefab.Name)} {CTypeNames.GetFunction(prefab.Name)}(flx_world *world, usize index) {{");
-        builder.AppendLine($"    if (index >= world->{CTypeNames.CountField(prefab.Name)}) abort();");
-        builder.AppendLine($"    {CTypeNames.ViewType(prefab.Name)} view = {{ &world->{CTypeNames.StorageField(prefab.Name)}[index] }};");
+        builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.GetFunction(prefab.FullName)}(flx_world *world, usize index) {{");
+        builder.AppendLine($"    if (index >= world->{CTypeNames.CountField(prefab.FullName)}) abort();");
+        builder.AppendLine($"    {CTypeNames.ViewType(prefab.FullName)} view = {{ &world->{CTypeNames.StorageField(prefab.FullName)}[index] }};");
         builder.AppendLine("    return view;");
         builder.AppendLine("}");
         builder.AppendLine();

@@ -1,0 +1,7 @@
+module game.greeting;
+
+import c "stdio.h" as stdio
+
+void SayHello(Zombie z) {
+    stdio.printf("Hello %s\n", z.name.c_str());
+}

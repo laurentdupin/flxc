@@ -3,6 +3,7 @@ namespace Flx.Compiler.Metadata;
 internal sealed class ModuleMetadata
 {
     public string Source { get; set; } = "";
+    public string Module { get; set; } = "";
     public string CFile { get; set; } = "";
     public List<FunctionMetadata> Functions { get; set; } = [];
     public List<CImportMetadata> CImports { get; set; } = [];
@@ -14,6 +15,7 @@ internal sealed class ModuleMetadata
 internal sealed class FunctionMetadata
 {
     public string SourceName { get; set; } = "";
+    public string FullName { get; set; } = "";
     public string MangledName { get; set; } = "";
     public string ReturnType { get; set; } = "";
     public List<ParameterMetadata> Parameters { get; set; } = [];
@@ -36,6 +38,7 @@ internal sealed class CImportMetadata
 internal sealed class ComponentMetadata
 {
     public string Name { get; set; } = "";
+    public string FullName { get; set; } = "";
     public List<ComponentFieldMetadata> Fields { get; set; } = [];
 }
 
@@ -49,6 +52,7 @@ internal sealed class ComponentFieldMetadata
 internal sealed class PrefabMetadata
 {
     public string Name { get; set; } = "";
+    public string FullName { get; set; } = "";
     public List<string> FlattenedComponents { get; set; } = [];
 }
 

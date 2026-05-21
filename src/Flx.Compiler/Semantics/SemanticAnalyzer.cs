@@ -57,16 +57,18 @@ internal sealed class SemanticAnalyzer
             if (CheckReservedProgramArgumentSymbol(component.Name, component.NameLocation))
                 continue;
 
-            if (model.ComponentsByName.ContainsKey(component.Name))
+            var fullName = CompilationModel.Qualify(module.Name, component.Name);
+            if (model.ComponentsByFullName.ContainsKey(fullName))
             {
-                _diagnostics.Report("FLX0302", $"duplicate component '{component.Name}'.", component.NameLocation);
+                _diagnostics.Report("FLX0302", $"duplicate component '{fullName}'.", component.NameLocation);
                 continue;
             }
 
             var fields = ParseComponentFields(component, module.SourceFile);
-            var symbol = new ComponentSymbol(module.SourceFile, component, component.Name, fields);
+            var symbol = new ComponentSymbol(module.SourceFile, component, component.Name, fullName, fields);
             module.Components.Add(symbol);
-            model.ComponentsByName.Add(symbol.Name, symbol);
+            model.ComponentsByFullName.Add(symbol.FullName, symbol);
+            AddByShortName(model.ComponentsByShortName, symbol.Name, symbol);
         }
     }
 
@@ -104,25 +106,30 @@ internal sealed class SemanticAnalyzer
             if (CheckReservedProgramArgumentSymbol(prefab.Name, prefab.NameLocation))
                 continue;
 
-            if (model.PrefabsByName.ContainsKey(prefab.Name))
+            var fullName = CompilationModel.Qualify(module.Name, prefab.Name);
+            if (model.PrefabsByFullName.ContainsKey(fullName))
             {
-                _diagnostics.Report("FLX0305", $"duplicate prefab '{prefab.Name}'.", prefab.NameLocation);
+                _diagnostics.Report("FLX0305", $"duplicate prefab '{fullName}'.", prefab.NameLocation);
                 continue;
             }
 
             var flattened = new List<ComponentSymbol>();
             var content = StripOuterBlock(prefab.BodyText);
-            var pattern = new Regex(@"\bflatten\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Multiline);
+            var pattern = new Regex(@"\bflatten\s+(?<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;", RegexOptions.Multiline);
 
             foreach (Match match in pattern.Matches(content))
             {
                 var componentName = match.Groups["name"].Value;
-                if (!model.ComponentsByName.TryGetValue(componentName, out var component))
+                var componentLocation = module.SourceFile.GetLocation(prefab.BodyStart + 1 + match.Groups["name"].Index);
+                var component = model.ResolveComponent(componentName, module);
+                if (component is null)
                 {
                     _diagnostics.Report(
-                        "FLX0306",
-                        $"flatten target component '{componentName}' does not exist.",
-                        module.SourceFile.GetLocation(prefab.BodyStart + 1 + match.Groups["name"].Index));
+                        model.IsAmbiguousComponentName(componentName, module) ? "FLX0404" : "FLX0306",
+                        model.IsAmbiguousComponentName(componentName, module)
+                            ? $"component name '{componentName}' is ambiguous."
+                            : $"flatten target component '{componentName}' does not exist.",
+                        componentLocation);
                     continue;
                 }
 
@@ -140,9 +147,10 @@ internal sealed class SemanticAnalyzer
             foreach (var duplicate in duplicateFields)
                 _diagnostics.Report("FLX0308", $"prefab '{prefab.Name}' has duplicate flattened field '{duplicate.Key}'.", prefab.Location);
 
-            var symbol = new PrefabSymbol(module.SourceFile, prefab, prefab.Name, flattened);
+            var symbol = new PrefabSymbol(module.SourceFile, prefab, prefab.Name, fullName, flattened);
             module.Prefabs.Add(symbol);
-            model.PrefabsByName.Add(symbol.Name, symbol);
+            model.PrefabsByFullName.Add(symbol.FullName, symbol);
+            AddByShortName(model.PrefabsByShortName, symbol.Name, symbol);
         }
     }
 
@@ -175,26 +183,24 @@ internal sealed class SemanticAnalyzer
             if (function.Name == "main")
                 _diagnostics.Report("FLX0102", "function name 'main' is reserved when using schedule-generated main.", function.NameLocation);
 
-            CheckTypeAlias(function.ReturnType, module, function.DeclarationLocation);
+            var returnType = ResolveTypeName(function.ReturnType, module, model, function.DeclarationLocation);
 
             var parameters = function.Parameters
-                .Select(parameter => new ParameterSymbol(parameter.Type, parameter.Name, parameter.Location))
+                .Select(parameter => new ParameterSymbol(ResolveTypeName(parameter.Type, module, model, parameter.Location), parameter.Name, parameter.Location))
                 .ToArray();
 
             foreach (var parameter in parameters)
-            {
                 CheckReservedProgramArgumentSymbol(parameter.Name, parameter.Location);
-                CheckTypeAlias(parameter.Type, module, parameter.Location);
-            }
 
-            if (registry.ContainsExactSignature(function.Name, parameters))
-                _diagnostics.Report("FLX0103", $"duplicate function signature '{FormatSignature(function.Name, parameters)}'.", function.NameLocation);
+            var fullName = CompilationModel.Qualify(module.Name, function.Name);
+            if (registry.ContainsExactSignature(fullName, parameters))
+                _diagnostics.Report("FLX0103", $"duplicate function signature '{FormatSignature(fullName, parameters)}'.", function.NameLocation);
 
             var mangledName = CNameMangler.Mangle(
                 unit.Source.DisplayPath,
                 function.Name,
                 parameters.Select(parameter => CTypeNames.MapType(parameter.Type, model, module)));
-            var symbol = new FunctionSymbol(module, unit.Source, function, function.Name, mangledName, function.ReturnType, parameters, function.NameLocation);
+            var symbol = new FunctionSymbol(module, unit.Source, function, function.Name, fullName, mangledName, returnType, parameters, function.NameLocation);
 
             module.Functions.Add(symbol);
             registry.TryAdd(symbol);
@@ -208,29 +214,54 @@ internal sealed class SemanticAnalyzer
             if (CheckReservedProgramArgumentSymbol(global.Name, global.NameLocation))
                 continue;
 
-            CheckTypeAlias(global.Type, module, global.DeclarationLocation);
+            var type = ResolveTypeName(global.Type, module, model, global.DeclarationLocation);
 
-            if (model.GlobalsByName.ContainsKey(global.Name))
+            var fullName = CompilationModel.Qualify(module.Name, global.Name);
+            if (model.GlobalsByFullName.ContainsKey(fullName))
+            {
+                _diagnostics.Report("FLX0110", $"duplicate global variable '{fullName}'.", global.NameLocation);
+                continue;
+            }
+
+            if (model.GlobalsByShortName.ContainsKey(global.Name))
             {
                 _diagnostics.Report("FLX0110", $"duplicate global variable '{global.Name}'.", global.NameLocation);
                 continue;
             }
 
-            var symbol = new GlobalVariableSymbol(module, unit.Source, global, global.Type, global.Name, global.Initializer, global.NameLocation);
+            var symbol = new GlobalVariableSymbol(module, unit.Source, global, type, global.Name, fullName, global.Initializer, global.NameLocation);
             module.Globals.Add(symbol);
-            model.GlobalsByName.Add(symbol.Name, symbol);
+            model.GlobalsByFullName.Add(symbol.FullName, symbol);
+            AddByShortName(model.GlobalsByShortName, symbol.Name, symbol);
         }
     }
 
-    private void CheckTypeAlias(string typeName, ModuleSymbol module, SourceLocation location)
+    private string ResolveTypeName(string typeName, ModuleSymbol module, CompilationModel model, SourceLocation location)
     {
-        var dotIndex = typeName.IndexOf('.', StringComparison.Ordinal);
-        if (dotIndex <= 0)
-            return;
+        if (typeName is "void" or "i32" or "usize" or "string" or "Array<string>")
+            return typeName;
 
-        var alias = typeName[..dotIndex];
-        if (!module.CImportsByAlias.ContainsKey(alias))
-            _diagnostics.Report("FLX0200", $"unknown C import alias '{alias}'.", location);
+        var dotIndex = typeName.IndexOf('.', StringComparison.Ordinal);
+        if (dotIndex > 0)
+        {
+            var alias = typeName[..dotIndex];
+            if (module.CImportsByAlias.ContainsKey(alias))
+                return typeName;
+        }
+
+        if (model.ResolvePrefab(typeName, module) is { } prefab)
+            return prefab.FullName;
+
+        if (model.IsAmbiguousPrefabName(typeName, module))
+            _diagnostics.Report("FLX0404", $"type name '{typeName}' is ambiguous.", location);
+        else if (model.ResolveComponent(typeName, module) is { } component)
+            return component.FullName;
+        else if (model.IsAmbiguousComponentName(typeName, module))
+            _diagnostics.Report("FLX0404", $"type name '{typeName}' is ambiguous.", location);
+        else if (dotIndex > 0)
+            _diagnostics.Report("FLX0405", $"type name '{typeName}' does not exist.", location);
+
+        return typeName;
     }
 
     private bool CheckReservedProgramArgumentSymbol(string name, SourceLocation location)
@@ -269,7 +300,14 @@ internal sealed class SemanticAnalyzer
                 continue;
 
             var runStep = (RunStepSyntax)step;
-            var overloads = model.FunctionRegistry.LookupSourceName(runStep.Name);
+            var scheduleModule = model.ScheduleModule;
+            var overloads = model.FunctionRegistry.ResolveFunctionGroup(runStep.Name, scheduleModule, out var ambiguous);
+            if (ambiguous)
+            {
+                _diagnostics.Report("FLX0406", $"schedule target '{runStep.Name}' is ambiguous.", runStep.Location);
+                continue;
+            }
+
             if (overloads.Count == 0)
             {
                 _diagnostics.Report("FLX0101", $"run target '{runStep.Name}' does not exist.", runStep.Location);
@@ -309,7 +347,7 @@ internal sealed class SemanticAnalyzer
         if (function.Parameters.Count == 0)
             return true;
 
-        return function.Parameters.Count == 1 && model.PrefabsByName.ContainsKey(function.Parameters[0].Type);
+        return function.Parameters.Count == 1 && model.PrefabsByFullName.ContainsKey(function.Parameters[0].Type);
     }
 
     private void CheckFunctionBodies(CompilationModel model)
@@ -342,5 +380,16 @@ internal sealed class SemanticAnalyzer
         return trimmed.Length >= 2 && trimmed[0] == '{' && trimmed[^1] == '}'
             ? trimmed[1..^1]
             : text;
+    }
+
+    private static void AddByShortName<T>(Dictionary<string, List<T>> dictionary, string shortName, T symbol)
+    {
+        if (!dictionary.TryGetValue(shortName, out var symbols))
+        {
+            symbols = [];
+            dictionary.Add(shortName, symbols);
+        }
+
+        symbols.Add(symbol);
     }
 }

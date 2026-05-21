@@ -1,0 +1,6 @@
+module main;
+
+schedule {
+    run a.Update;
+    run b.Update;
+}

@@ -1,0 +1,5 @@
+module body.main;
+
+schedule {
+    run body.a.Run;
+}

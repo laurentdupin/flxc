@@ -7,6 +7,7 @@ internal enum TokenKind
     Identifier,
     StringLiteral,
     CharLiteral,
+    ModuleKeyword,
     ImportKeyword,
     CKeyword,
     AsKeyword,

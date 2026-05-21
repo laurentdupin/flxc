@@ -10,12 +10,25 @@ internal sealed class CompilationUnitSyntax
     }
 
     public SourceFile Source { get; }
+    public ModuleDeclSyntax? Module { get; set; }
     public List<CImportSyntax> CImports { get; } = [];
     public List<ComponentDeclSyntax> Components { get; } = [];
     public List<PrefabDeclSyntax> Prefabs { get; } = [];
     public List<GlobalVariableDeclSyntax> Globals { get; } = [];
     public List<FunctionDeclSyntax> Functions { get; } = [];
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
+}
+
+internal sealed class ModuleDeclSyntax
+{
+    public ModuleDeclSyntax(string name, SourceLocation location)
+    {
+        Name = name;
+        Location = location;
+    }
+
+    public string Name { get; }
+    public SourceLocation Location { get; }
 }
 
 internal sealed class CImportSyntax

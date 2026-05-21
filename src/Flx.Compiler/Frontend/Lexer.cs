@@ -85,6 +85,7 @@ internal sealed class Lexer
         var text = _source.Text[start.._position];
         var kind = text switch
         {
+            "module" => TokenKind.ModuleKeyword,
             "import" => TokenKind.ImportKeyword,
             "c" => TokenKind.CKeyword,
             "as" => TokenKind.AsKeyword,

@@ -24,6 +24,22 @@ internal sealed class Parser
         {
             switch (Current.Kind)
             {
+                case TokenKind.ModuleKeyword:
+                    if (unit.Module is not null)
+                        _diagnostics.Report("FLX0402", "only one module declaration is allowed per file.", Current.Location);
+
+                    if (unit.CImports.Count > 0 ||
+                        unit.Components.Count > 0 ||
+                        unit.Prefabs.Count > 0 ||
+                        unit.Globals.Count > 0 ||
+                        unit.Functions.Count > 0 ||
+                        unit.Schedules.Count > 0)
+                    {
+                        _diagnostics.Report("FLX0403", "module declaration must appear before imports and declarations.", Current.Location);
+                    }
+
+                    unit.Module = ParseModule();
+                    break;
                 case TokenKind.ImportKeyword:
                     unit.CImports.Add(ParseCImport());
                     break;
@@ -48,6 +64,14 @@ internal sealed class Parser
         }
 
         return unit;
+    }
+
+    private ModuleDeclSyntax ParseModule()
+    {
+        var moduleToken = Expect(TokenKind.ModuleKeyword, "expected 'module'.");
+        var name = ParseQualifiedName("expected module name.");
+        Expect(TokenKind.Semicolon, "expected ';' after module declaration.");
+        return new ModuleDeclSyntax(name, moduleToken.Location);
     }
 
     private CImportSyntax ParseCImport()
@@ -182,8 +206,9 @@ internal sealed class Parser
             if (Current.Kind == TokenKind.RunKeyword)
             {
                 Advance();
-                var target = ExpectIdentifier("expected run target name.");
-                steps.Add(new RunStepSyntax(target.Text, target.Location));
+                var location = Current.Location;
+                var target = ParseQualifiedName("expected run target name.");
+                steps.Add(new RunStepSyntax(target, location));
                 Expect(TokenKind.Semicolon, "expected ';' after run statement.");
                 continue;
             }
@@ -221,12 +246,13 @@ internal sealed class Parser
     {
         if (Current.Kind is TokenKind.Identifier or TokenKind.VoidKeyword)
         {
-            var first = Advance().Text;
-            if (Current.Kind == TokenKind.Dot)
+            var first = Advance();
+            var name = first.Text;
+            while (Current.Kind == TokenKind.Dot)
             {
                 Advance();
-                var second = ExpectIdentifier("expected identifier after '.'.");
-                return $"{first}.{second.Text}";
+                var next = ExpectIdentifier("expected identifier after '.'.");
+                name += "." + next.Text;
             }
 
             if (Current.Kind == TokenKind.Unknown && Current.Text == "<")
@@ -234,15 +260,30 @@ internal sealed class Parser
                 Advance();
                 var argument = ParseTypeName("expected generic type argument.");
                 ExpectUnknown(">", "expected '>' after generic type argument.");
-                return $"{first}<{argument}>";
+                return $"{name}<{argument}>";
             }
 
-            return first;
+            return name;
         }
 
         _diagnostics.Report("FLX0008", message, Current.Location);
         Advance();
         return "void";
+    }
+
+    private string ParseQualifiedName(string message)
+    {
+        var name = ExpectIdentifier(message);
+        var result = name.Text;
+
+        while (Current.Kind == TokenKind.Dot)
+        {
+            Advance();
+            var next = ExpectIdentifier("expected identifier after '.'.");
+            result += "." + next.Text;
+        }
+
+        return result;
     }
 
     private void ExpectUnknown(string text, string message)

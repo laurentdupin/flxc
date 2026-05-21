@@ -94,11 +94,13 @@ internal sealed class CBodyLowerer
 
         var create = Regex.Match(
             trimmed,
-            @"^(?<type>[A-Za-z_][A-Za-z0-9_]*)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*create\s+(?<create>[A-Za-z_][A-Za-z0-9_]*)\s*;$");
-        if (create.Success && create.Groups["type"].Value == create.Groups["create"].Value &&
-            _model.PrefabsByName.ContainsKey(create.Groups["type"].Value))
+            @"^(?<type>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*create\s+(?<create>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;$");
+        var declaredPrefab = create.Success ? _model.ResolvePrefab(create.Groups["type"].Value, _module) : null;
+        var createdPrefab = create.Success ? _model.ResolvePrefab(create.Groups["create"].Value, _module) : null;
+        if (create.Success && declaredPrefab is not null && createdPrefab is not null &&
+            declaredPrefab.FullName == createdPrefab.FullName)
         {
-            var prefabName = create.Groups["type"].Value;
+            var prefabName = declaredPrefab.FullName;
             var variableName = create.Groups["name"].Value;
             builder.AppendLine($"{indent}{CTypeNames.ViewType(prefabName)} {variableName} = {CTypeNames.CreateFunction(prefabName)}(world);");
             scope.Declare(variableName, prefabName);
@@ -113,7 +115,7 @@ internal sealed class CBodyLowerer
             TryResolvePrefabField(scope, fieldAssignment.Groups["target"].Value, fieldAssignment.Groups["field"].Value, out var target, out var field))
         {
             var value = LowerStringSourceExpression(fieldAssignment.Groups["value"].Value.Trim(), scope);
-            builder.AppendLine($"{indent}flx_string_assign(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.Name)}.{field.Field.Name}, {value});");
+            builder.AppendLine($"{indent}flx_string_assign(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name}, {value});");
             return;
         }
 
@@ -122,7 +124,8 @@ internal sealed class CBodyLowerer
             _module.CImportsByAlias,
             _function.SourceFile,
             _function.Syntax.BodyStart,
-            functionRegistry: _model.FunctionRegistry);
+            functionRegistry: _model.FunctionRegistry,
+            currentModule: _module);
         var lowered = LowerExpression(rewritten, scope);
         lowered = CBodyRewriter.RewriteProgramArguments(lowered);
         builder.AppendLine($"{indent}{lowered}");
@@ -150,7 +153,7 @@ internal sealed class CBodyLowerer
             match =>
             {
                 if (TryResolvePrefabField(scope, match.Groups["target"].Value, match.Groups["field"].Value, out var target, out var field))
-                    return $"flx_string_c_str(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.Name)}.{field.Field.Name})";
+                    return $"flx_string_c_str(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name})";
 
                 return match.Value;
             });
@@ -201,7 +204,7 @@ internal sealed class CBodyLowerer
         field = null!;
 
         var variableType = scope.Lookup(variableName);
-        if (variableType is null || !_model.PrefabsByName.TryGetValue(variableType, out var prefab))
+        if (variableType is null || !_model.PrefabsByFullName.TryGetValue(variableType, out var prefab))
             return false;
 
         var matches = prefab.Fields.Where(candidate => candidate.Field.Name == fieldName).ToArray();
