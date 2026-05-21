@@ -1,0 +1,5 @@
+import c "stdio.h" as stdio
+
+void A() {
+    stdio.printf("A from another file\n");
+}

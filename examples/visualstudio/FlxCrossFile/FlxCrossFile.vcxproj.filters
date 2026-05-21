@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{592C2685-BE71-4649-97F4-E2F510C31211}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxCompile Include="Greeting.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxCompile>
+    <FlxCompile Include="Main.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxCompile>
+  </ItemGroup>
+</Project>

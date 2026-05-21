@@ -10,6 +10,7 @@ Then open one of the solutions:
 
 ```text
 FlxHello\FlxHello.sln
+FlxCrossFile\FlxCrossFile.sln
 FlxWindow\FlxWindow.sln
 ```
 
@@ -31,6 +32,8 @@ FLX Source Files
 Generated C remains under `$(IntDir)\flx` and is not shown as user source in Solution Explorer.
 
 `FlxHello` builds a console executable.
+
+`FlxCrossFile` builds a console executable from two `.flx` files. `Main.flx` calls a function defined in `Greeting.flx`, which exercises generated module headers and cross-file FLX symbol visibility.
 
 `FlxWindow` builds a native Win32 window executable and links:
 

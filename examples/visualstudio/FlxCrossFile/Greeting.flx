@@ -1,0 +1,5 @@
+import c "stdio.h" as stdio
+
+void PrintGreeting() {
+    stdio.printf("Hello from Greeting.flx\n");
+}

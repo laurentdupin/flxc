@@ -1,0 +1,7 @@
+void RunExample() {
+    PrintGreeting();
+}
+
+schedule {
+    run RunExample;
+}

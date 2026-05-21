@@ -1,0 +1,7 @@
+void B() {
+    A();
+}
+
+schedule {
+    run B;
+}

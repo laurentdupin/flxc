@@ -149,8 +149,10 @@ internal sealed class BuildDriver
         Directory.CreateDirectory(outputDirectory);
 
         var cGenerator = new CGenerator();
+        var headerGenerator = new CHeaderGenerator();
         var generatedSources = new List<string>();
         var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        const string umbrellaHeaderFileName = "flx_program.g.h";
 
         if (model.RequiresRuntime)
         {
@@ -161,11 +163,25 @@ internal sealed class BuildDriver
             generatedSources.Add(runtimeSource);
         }
 
+        var moduleHeaders = new List<ModuleHeader>();
         foreach (var module in model.Modules)
         {
+            var headerFileName = UniqueFileName(Path.GetFileName(module.SourceFile.DisplayPath) + ".g.h", usedNames);
+            var headerPath = Path.Combine(outputDirectory, headerFileName);
+            await File.WriteAllTextAsync(headerPath, headerGenerator.Generate(module, model, headerFileName));
+            moduleHeaders.Add(new ModuleHeader(module, headerFileName));
+        }
+
+        await File.WriteAllTextAsync(
+            Path.Combine(outputDirectory, umbrellaHeaderFileName),
+            new CUmbrellaHeaderGenerator().Generate(model, moduleHeaders));
+
+        foreach (var moduleHeader in moduleHeaders)
+        {
+            var module = moduleHeader.Module;
             var cFileName = UniqueFileName(Path.GetFileName(module.SourceFile.DisplayPath) + ".g.c", usedNames);
             var cPath = Path.Combine(outputDirectory, cFileName);
-            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model, options.AbsoluteLineDirectives));
+            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model, options.AbsoluteLineDirectives, umbrellaHeaderFileName));
             generatedSources.Add(cPath);
 
             var metadataPath = Path.Combine(outputDirectory, Path.GetFileName(module.SourceFile.DisplayPath) + ".meta.json");
@@ -176,7 +192,7 @@ internal sealed class BuildDriver
         if (!options.CompileOnly && !options.NoMain && model.Schedule is not null)
         {
             mainSource = Path.Combine(outputDirectory, "flx_main.g.c");
-            await File.WriteAllTextAsync(mainSource, new CMainGenerator().Generate(model));
+            await File.WriteAllTextAsync(mainSource, new CMainGenerator().Generate(model, umbrellaHeaderFileName));
             generatedSources.Add(mainSource);
         }
 
