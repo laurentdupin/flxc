@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <BeforeBuildCompileTargets Condition="'$(FlxEnabled)' == 'true'">$(BeforeBuildCompileTargets);FlxGenerateC</BeforeBuildCompileTargets>
+  </PropertyGroup>
+
+  <Target
+    Name="FlxGenerateC"
+    Condition="'$(FlxEnabled)' == 'true' and '@(FlxCompile)' != ''">
+
+    <Error
+      Condition="!Exists('$(FlxCompilerPath)')"
+      Text="flxc.exe not found at '$(FlxCompilerPath)'. Build Flx.Compiler or set FlxCompilerPath." />
+
+    <MakeDir Directories="$(FlxGeneratedDir)" />
+
+    <ItemGroup>
+      <_FlxDefine Include="$(FlxPreprocessorDefinitions)" Condition="'$(FlxPreprocessorDefinitions)' != ''" />
+      <_FlxIncludeDir Include="$(FlxAdditionalIncludeDirectories)" Condition="'$(FlxAdditionalIncludeDirectories)' != ''" />
+    </ItemGroup>
+
+    <Message Text="FLX: inputs @(FlxCompile)" Importance="High" />
+    <Message Text="FLX: generated C directory $(FlxGeneratedDir)" Importance="High" />
+
+    <Exec
+      Command="&quot;$(FlxCompilerPath)&quot; @(FlxCompile->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+
+    <ReadLinesFromFile File="$(FlxGeneratedList)">
+      <Output TaskParameter="Lines" ItemName="FlxGeneratedC" />
+    </ReadLinesFromFile>
+
+    <ItemGroup>
+      <ClCompile Include="@(FlxGeneratedC)">
+        <CompileAs>CompileAsC</CompileAs>
+      </ClCompile>
+    </ItemGroup>
+
+    <Message Text="FLX: added generated C @(FlxGeneratedC)" Importance="High" />
+  </Target>
+
+  <Target Name="FlxClean" BeforeTargets="Clean" Condition="'$(FlxEnabled)' == 'true'">
+    <RemoveDir Directories="$(FlxGeneratedDir)" Condition="Exists('$(FlxGeneratedDir)')" />
+  </Target>
+</Project>

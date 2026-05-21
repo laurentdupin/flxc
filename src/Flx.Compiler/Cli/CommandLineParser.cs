@@ -85,6 +85,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (arg == "--absolute-line-directives")
+            {
+                options.AbsoluteLineDirectives = true;
+                continue;
+            }
+
             if (arg == "-o")
             {
                 options.OutputPath = RequireValue(args, ref i, arg, diagnostics);
@@ -100,6 +106,18 @@ internal static class CommandLineParser
             if (TryReadLongOptionValue(args, ref i, arg, "--obj-dir", diagnostics, out var objDir))
             {
                 options.ObjDir = objDir;
+                continue;
+            }
+
+            if (TryReadLongOptionValue(args, ref i, arg, "--generated-list", diagnostics, out var generatedList))
+            {
+                options.GeneratedListPath = generatedList;
+                continue;
+            }
+
+            if (TryReadLongOptionValue(args, ref i, arg, "--diagnostics-format", diagnostics, out var diagnosticsFormat))
+            {
+                options.DiagnosticsFormat = diagnosticsFormat;
                 continue;
             }
 
@@ -177,6 +195,13 @@ internal static class CommandLineParser
 
         if (options.CompileOnly && options.InputFiles.Count > 1 && options.OutputPath is not null)
             diagnostics.Report("FLX9003", "-c with multiple input files cannot use a single -o output path.");
+
+        if (options.DiagnosticsFormat is not null &&
+            !options.DiagnosticsFormat.Equals("default", StringComparison.OrdinalIgnoreCase) &&
+            !options.DiagnosticsFormat.Equals("msbuild", StringComparison.OrdinalIgnoreCase))
+        {
+            diagnostics.Report("FLX9006", $"unknown diagnostics format '{options.DiagnosticsFormat}'. Expected 'default' or 'msbuild'.");
+        }
 
         return options;
     }

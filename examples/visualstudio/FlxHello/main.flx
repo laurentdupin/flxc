@@ -1,0 +1,9 @@
+import c "stdio.h" as stdio
+
+void HelloWorld() {
+    stdio.printf("Hello from Visual Studio FLX\n");
+}
+
+schedule {
+    run HelloWorld;
+}

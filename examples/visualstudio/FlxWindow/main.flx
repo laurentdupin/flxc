@@ -1,0 +1,95 @@
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+
+import c "windows.h" as windows
+
+windows.HWND MainWindow = null;
+
+windows.LRESULT WindowProc(
+    windows.HWND hwnd,
+    windows.UINT message,
+    windows.WPARAM wParam,
+    windows.LPARAM lParam
+) {
+    switch (message) {
+        case windows.WM_PAINT: {
+            windows.PAINTSTRUCT ps;
+            windows.HDC dc = windows.BeginPaint(hwnd, &ps);
+
+            windows.HBRUSH brush = (windows.HBRUSH)(windows.COLOR_HIGHLIGHT + 1);
+
+            windows.FillRect(dc, &ps.rcPaint, brush);
+            windows.EndPaint(hwnd, &ps);
+            return 0;
+        }
+
+        case windows.WM_DESTROY:
+            MainWindow = null;
+            windows.PostQuitMessage(0);
+            return 0;
+    }
+
+    return windows.DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+void CreateMainWindow() {
+    windows.HINSTANCE instance = windows.GetModuleHandleW(null);
+
+    windows.WNDCLASSW windowClass = { 0 };
+    windowClass.lpfnWndProc = WindowProc;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = L"FlxWindowClass";
+
+    windows.RegisterClassW(&windowClass);
+
+    MainWindow = windows.CreateWindowExW(
+        0,
+        L"FlxWindowClass",
+        L"Hello from FLX",
+        windows.WS_OVERLAPPEDWINDOW,
+        windows.CW_USEDEFAULT,
+        windows.CW_USEDEFAULT,
+        800,
+        600,
+        null,
+        null,
+        instance,
+        null
+    );
+
+    windows.ShowWindow(MainWindow, windows.SW_SHOW);
+}
+
+void PumpMessages() {
+    windows.MSG message;
+
+    while (windows.PeekMessageW(&message, null, 0, 0, windows.PM_REMOVE)) {
+        if (message.message == windows.WM_QUIT) {
+            breakloop;
+            return;
+        }
+
+        windows.TranslateMessage(&message);
+        windows.DispatchMessageW(&message);
+    }
+}
+
+void Render() {
+    if (MainWindow == null) {
+        return;
+    }
+
+    windows.InvalidateRect(MainWindow, null, 0);
+    windows.UpdateWindow(MainWindow);
+
+    windows.Sleep(16);
+}
+
+schedule {
+    run CreateMainWindow;
+
+frame:
+    run PumpMessages;
+    run Render;
+    loopto frame;
+}

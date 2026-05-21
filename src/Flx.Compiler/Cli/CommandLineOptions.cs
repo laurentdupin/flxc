@@ -15,8 +15,11 @@ internal sealed class CommandLineOptions
     public bool ShowHelp { get; set; }
     public bool ShowVersion { get; set; }
     public string? ObjDir { get; set; }
+    public string? GeneratedListPath { get; set; }
+    public string? DiagnosticsFormat { get; set; }
     public string? CCompiler { get; set; }
     public string? CCompilerMode { get; set; }
+    public bool AbsoluteLineDirectives { get; set; }
     public List<string> IncludeDirs { get; } = [];
     public List<string> LibraryDirs { get; } = [];
     public List<string> Libraries { get; } = [];
@@ -42,6 +45,12 @@ internal sealed class CommandLineOptions
           --keep-pp           Keep preprocessed FLX files after native build
           --no-preprocess     Disable FLX preprocessing
           --obj-dir <dir>     Intermediate/generated file directory
+          --generated-list <path>
+                              Write generated C paths, one per line
+          --diagnostics-format <fmt>
+                              Diagnostic format: default or msbuild
+          --absolute-line-directives
+                              Use absolute source paths in generated #line directives
           --cc <compiler>     C compiler name or path, or auto
           --cc-mode <mode>    C compiler mode: gcc, clang, or msvc
           -I <dir>            C include directory

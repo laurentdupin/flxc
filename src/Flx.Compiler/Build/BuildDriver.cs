@@ -165,7 +165,7 @@ internal sealed class BuildDriver
         {
             var cFileName = UniqueFileName(Path.GetFileName(module.SourceFile.DisplayPath) + ".g.c", usedNames);
             var cPath = Path.Combine(outputDirectory, cFileName);
-            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model));
+            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model, options.AbsoluteLineDirectives));
             generatedSources.Add(cPath);
 
             var metadataPath = Path.Combine(outputDirectory, Path.GetFileName(module.SourceFile.DisplayPath) + ".meta.json");
@@ -180,7 +180,22 @@ internal sealed class BuildDriver
             generatedSources.Add(mainSource);
         }
 
+        if (!string.IsNullOrWhiteSpace(options.GeneratedListPath))
+            await WriteGeneratedListAsync(options.GeneratedListPath, generatedSources);
+
         return new GenerationResult(outputDirectory, shouldDeleteDirectory, generatedSources, mainSource);
+    }
+
+    private static async Task WriteGeneratedListAsync(string generatedListPath, IReadOnlyList<string> generatedSources)
+    {
+        var fullPath = Path.GetFullPath(generatedListPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+        var lines = generatedSources
+            .Select(Path.GetFullPath)
+            .Order(StringComparer.OrdinalIgnoreCase);
+
+        await File.WriteAllLinesAsync(fullPath, lines);
     }
 
     private static string DetermineGeneratedDirectory(CommandLineOptions options, out bool shouldDeleteDirectory)

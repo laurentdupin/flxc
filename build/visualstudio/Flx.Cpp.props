@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="FlxDefaults">
+    <FlxEnabled Condition="'$(FlxEnabled)' == ''">true</FlxEnabled>
+
+    <FlxRepoRoot Condition="'$(FlxRepoRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</FlxRepoRoot>
+    <FlxCompilerPath Condition="'$(FlxCompilerPath)' == ''">$(FlxRepoRoot)src\Flx.Compiler\bin\$(Configuration)\net10.0\flxc.exe</FlxCompilerPath>
+
+    <FlxGeneratedDir Condition="'$(FlxGeneratedDir)' == ''">$(IntDir)flx</FlxGeneratedDir>
+    <FlxGeneratedList Condition="'$(FlxGeneratedList)' == ''">$(FlxGeneratedDir)\generated_c_files.txt</FlxGeneratedList>
+
+    <FlxCCompiler Condition="'$(FlxCCompiler)' == ''">cl</FlxCCompiler>
+    <FlxCCompilerMode Condition="'$(FlxCCompilerMode)' == ''">msvc</FlxCCompilerMode>
+
+    <FlxAdditionalOptions Condition="'$(FlxAdditionalOptions)' == ''">--diagnostics-format msbuild --absolute-line-directives</FlxAdditionalOptions>
+    <FlxPreprocessorDefinitions Condition="'$(FlxPreprocessorDefinitions)' == ''"></FlxPreprocessorDefinitions>
+    <FlxAdditionalIncludeDirectories Condition="'$(FlxAdditionalIncludeDirectories)' == ''"></FlxAdditionalIncludeDirectories>
+
+    <FlxKeepGeneratedC Condition="'$(FlxKeepGeneratedC)' == ''">true</FlxKeepGeneratedC>
+  </PropertyGroup>
+</Project>
