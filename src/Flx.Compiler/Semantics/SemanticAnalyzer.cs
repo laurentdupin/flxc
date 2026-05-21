@@ -33,7 +33,7 @@ internal sealed class SemanticAnalyzer
             BindPrefabs(module, model);
 
         foreach (var module in model.Modules)
-            BindFunctions(module.Syntax, module, model.FunctionRegistry);
+            BindFunctions(module.Syntax, module, model, model.FunctionRegistry);
 
         CheckSchedules(model, requireSchedule, validateScheduleTargets);
         CheckFunctionBodies(model);
@@ -147,29 +147,45 @@ internal sealed class SemanticAnalyzer
         }
     }
 
-    private void BindFunctions(CompilationUnitSyntax unit, ModuleSymbol module, FunctionRegistry registry)
+    private void BindFunctions(CompilationUnitSyntax unit, ModuleSymbol module, CompilationModel model, FunctionRegistry registry)
     {
         foreach (var function in unit.Functions)
         {
             if (function.Name == "main")
                 _diagnostics.Report("FLX0102", "function name 'main' is reserved when using schedule-generated main.", function.NameLocation);
 
-            if (function.ReturnType != "void")
-                _diagnostics.Report("FLX0106", $"MVP only supports void functions; found return type '{function.ReturnType}'.", function.DeclarationLocation);
+            CheckTypeAlias(function.ReturnType, module, function.DeclarationLocation);
 
             var parameters = function.Parameters
                 .Select(parameter => new ParameterSymbol(parameter.Type, parameter.Name, parameter.Location))
                 .ToArray();
 
+            foreach (var parameter in parameters)
+                CheckTypeAlias(parameter.Type, module, parameter.Location);
+
             if (registry.ContainsExactSignature(function.Name, parameters))
                 _diagnostics.Report("FLX0103", $"duplicate function signature '{FormatSignature(function.Name, parameters)}'.", function.NameLocation);
 
-            var mangledName = CNameMangler.Mangle(unit.Source.DisplayPath, function.Name, parameters.Select(parameter => parameter.Type));
-            var symbol = new FunctionSymbol(unit.Source, function, function.Name, mangledName, function.ReturnType, parameters, function.NameLocation);
+            var mangledName = CNameMangler.Mangle(
+                unit.Source.DisplayPath,
+                function.Name,
+                parameters.Select(parameter => CTypeNames.MapType(parameter.Type, model, module)));
+            var symbol = new FunctionSymbol(module, unit.Source, function, function.Name, mangledName, function.ReturnType, parameters, function.NameLocation);
 
             module.Functions.Add(symbol);
             registry.TryAdd(symbol);
         }
+    }
+
+    private void CheckTypeAlias(string typeName, ModuleSymbol module, SourceLocation location)
+    {
+        var dotIndex = typeName.IndexOf('.', StringComparison.Ordinal);
+        if (dotIndex <= 0)
+            return;
+
+        var alias = typeName[..dotIndex];
+        if (!module.CImportsByAlias.ContainsKey(alias))
+            _diagnostics.Report("FLX0200", $"unknown C import alias '{alias}'.", location);
     }
 
     private void CheckSchedules(CompilationModel model, bool requireSchedule, bool validateScheduleTargets)

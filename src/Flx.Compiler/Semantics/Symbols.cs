@@ -97,6 +97,7 @@ internal sealed class PrefabSymbol
 internal sealed class FunctionSymbol
 {
     public FunctionSymbol(
+        ModuleSymbol module,
         SourceFile sourceFile,
         FunctionDeclSyntax syntax,
         string sourceName,
@@ -105,6 +106,7 @@ internal sealed class FunctionSymbol
         IReadOnlyList<ParameterSymbol> parameters,
         SourceLocation location)
     {
+        Module = module;
         SourceFile = sourceFile;
         Syntax = syntax;
         SourceName = sourceName;
@@ -114,6 +116,7 @@ internal sealed class FunctionSymbol
         Location = location;
     }
 
+    public ModuleSymbol Module { get; }
     public SourceFile SourceFile { get; }
     public FunctionDeclSyntax Syntax { get; }
     public string SourceName { get; }

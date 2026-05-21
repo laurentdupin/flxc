@@ -22,7 +22,8 @@ internal static class CBodyRewriter
         IReadOnlyDictionary<string, CImportSymbol> importsByAlias,
         SourceFile source,
         int bodyStart,
-        DiagnosticBag? diagnostics = null)
+        DiagnosticBag? diagnostics = null,
+        FunctionRegistry? functionRegistry = null)
     {
         var output = new StringBuilder(body.Length);
         var position = 0;
@@ -57,7 +58,7 @@ internal static class CBodyRewriter
 
             if (Lexer.IsIdentifierStart(current))
             {
-                if (TryRewriteAliasCall(body, output, ref position, importsByAlias, source, bodyStart, diagnostics))
+                if (TryRewriteIdentifier(body, output, ref position, importsByAlias, source, bodyStart, diagnostics, functionRegistry))
                     continue;
             }
 
@@ -68,50 +69,79 @@ internal static class CBodyRewriter
         return output.ToString();
     }
 
-    private static bool TryRewriteAliasCall(
+    private static bool TryRewriteIdentifier(
         string body,
         StringBuilder output,
         ref int position,
         IReadOnlyDictionary<string, CImportSymbol> importsByAlias,
         SourceFile source,
         int bodyStart,
-        DiagnosticBag? diagnostics)
+        DiagnosticBag? diagnostics,
+        FunctionRegistry? functionRegistry)
     {
         var identifierStart = position;
-        if (IsMemberChainSegment(body, identifierStart))
-            return false;
-
         var identifierEnd = ReadIdentifier(body, identifierStart);
+        var identifier = body[identifierStart..identifierEnd];
+
+        if (IsMemberChainSegment(body, identifierStart))
+        {
+            output.Append(identifier);
+            position = identifierEnd;
+            return true;
+        }
+
         var afterAliasWhitespace = SkipWhitespace(body, identifierEnd);
 
-        if (afterAliasWhitespace >= body.Length || body[afterAliasWhitespace] != '.')
-            return false;
-
-        var afterDotWhitespace = SkipWhitespace(body, afterAliasWhitespace + 1);
-        if (afterDotWhitespace >= body.Length || !Lexer.IsIdentifierStart(body[afterDotWhitespace]))
-            return false;
-
-        var memberStart = afterDotWhitespace;
-        var memberEnd = ReadIdentifier(body, memberStart);
-        var afterMemberWhitespace = SkipWhitespace(body, memberEnd);
-
-        var alias = body[identifierStart..identifierEnd];
-        if (importsByAlias.ContainsKey(alias))
+        if (afterAliasWhitespace < body.Length && body[afterAliasWhitespace] == '.')
         {
-            output.Append(body[memberStart..memberEnd]);
-            position = memberEnd;
+            var afterDotWhitespace = SkipWhitespace(body, afterAliasWhitespace + 1);
+            if (afterDotWhitespace < body.Length && Lexer.IsIdentifierStart(body[afterDotWhitespace]))
+            {
+                var memberStart = afterDotWhitespace;
+                var memberEnd = ReadIdentifier(body, memberStart);
+                var memberName = body[memberStart..memberEnd];
+                var afterMemberWhitespace = SkipWhitespace(body, memberEnd);
+
+                if (importsByAlias.ContainsKey(identifier))
+                {
+                    output.Append(memberName);
+                    position = memberEnd;
+                    return true;
+                }
+
+                if (afterMemberWhitespace < body.Length &&
+                    body[afterMemberWhitespace] == '(' &&
+                    memberName is not ("c_str" or "length" or "empty" or "clone"))
+                {
+                    diagnostics?.Report("FLX0200", $"unknown C import alias '{identifier}'.", source.GetLocation(bodyStart + identifierStart));
+                    output.Append(body[identifierStart..memberEnd]);
+                    position = memberEnd;
+                    return true;
+                }
+            }
+        }
+
+        if (identifier == "null")
+        {
+            output.Append("NULL");
+            position = identifierEnd;
             return true;
         }
 
-        if (afterMemberWhitespace < body.Length && body[afterMemberWhitespace] == '(')
+        if (functionRegistry is not null)
         {
-            diagnostics?.Report("FLX0200", $"unknown C import alias '{alias}'.", source.GetLocation(bodyStart + identifierStart));
-            output.Append(body[identifierStart..memberEnd]);
-            position = memberEnd;
-            return true;
+            var matches = functionRegistry.LookupSourceName(identifier);
+            if (matches.Count == 1)
+            {
+                output.Append(matches[0].MangledName);
+                position = identifierEnd;
+                return true;
+            }
         }
 
-        return false;
+        output.Append(identifier);
+        position = identifierEnd;
+        return true;
     }
 
     private static bool IsMemberChainSegment(string body, int identifierStart)

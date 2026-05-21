@@ -113,7 +113,12 @@ internal sealed class CBodyLowerer
             return;
         }
 
-        var rewritten = CBodyRewriter.Rewrite(trimmed, _module.CImportsByAlias, _function.SourceFile, _function.Syntax.BodyStart);
+        var rewritten = CBodyRewriter.Rewrite(
+            trimmed,
+            _module.CImportsByAlias,
+            _function.SourceFile,
+            _function.Syntax.BodyStart,
+            functionRegistry: _model.FunctionRegistry);
         builder.AppendLine($"{indent}{LowerExpression(rewritten, scope)}");
     }
 
@@ -212,6 +217,13 @@ internal sealed class CBodyLowerer
             if (position >= content.Length)
                 break;
 
+            if (TryReadRawBlockStatement(content, ref position, statements, "switch") ||
+                TryReadRawBlockStatement(content, ref position, statements, "while") ||
+                TryReadRawBlockStatement(content, ref position, statements, "if"))
+            {
+                continue;
+            }
+
             if (StartsKeyword(content, position, "for"))
             {
                 var headerOpen = content.IndexOf('(', position);
@@ -251,6 +263,33 @@ internal sealed class CBodyLowerer
         }
 
         return statements;
+    }
+
+    private static bool TryReadRawBlockStatement(string content, ref int position, List<BodyStatement> statements, string keyword)
+    {
+        if (!StartsKeyword(content, position, keyword))
+            return false;
+
+        var headerOpen = content.IndexOf('(', position);
+        if (headerOpen < 0)
+            return false;
+
+        var headerClose = FindMatching(content, headerOpen, '(', ')');
+        if (headerClose < 0)
+            return false;
+
+        var blockOpen = headerClose + 1;
+        SkipWhitespace(content, ref blockOpen);
+        if (blockOpen >= content.Length || content[blockOpen] != '{')
+            return false;
+
+        var blockClose = FindMatching(content, blockOpen, '{', '}');
+        if (blockClose < 0)
+            return false;
+
+        statements.Add(new BodyStatement(content[position..(blockClose + 1)], null, null));
+        position = blockClose + 1;
+        return true;
     }
 
     private static int FindStatementEnd(string text, int start)

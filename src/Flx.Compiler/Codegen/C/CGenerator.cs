@@ -12,6 +12,19 @@ internal sealed class CGenerator
         builder.AppendLine($"/* Source: {module.SourceFile.DisplayPath} */");
         builder.AppendLine();
 
+        var preservedDirectives = CollectPreservedPreprocessorDirectives(module.SourceFile.OriginalText);
+        foreach (var directive in preservedDirectives)
+            builder.AppendLine(directive);
+
+        if (preservedDirectives.Count > 0)
+            builder.AppendLine();
+
+        if (!model.RequiresRuntime && ModuleUsesSizeT(module))
+        {
+            builder.AppendLine("#include <stddef.h>");
+            builder.AppendLine();
+        }
+
         foreach (var header in module.CImports.Select(import => import.Header).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
             builder.AppendLine($"#include <{header}>");
 
@@ -30,7 +43,7 @@ internal sealed class CGenerator
             rewrittenBody = AddBodyLineDirective(rewrittenBody, function);
 
             builder.AppendLine($"#line {function.Syntax.DeclarationLocation.Line} \"{EscapeLinePath(function.SourceFile.DisplayPath)}\"");
-            builder.Append($"{CTypeNames.MapType(function.ReturnType, model)} {function.MangledName}(");
+            builder.Append($"{CTypeNames.MapType(function.ReturnType, model, module)} {function.MangledName}(");
             builder.Append(CTypeNames.FormatFunctionParameters(function, model));
             builder.Append(") ");
             builder.AppendLine(rewrittenBody);
@@ -38,6 +51,30 @@ internal sealed class CGenerator
         }
 
         return builder.ToString();
+    }
+
+    private static bool ModuleUsesSizeT(ModuleSymbol module)
+    {
+        return module.Functions.Any(function =>
+            function.ReturnType == "usize" ||
+            function.Parameters.Any(parameter => parameter.Type == "usize"));
+    }
+
+    private static IReadOnlyList<string> CollectPreservedPreprocessorDirectives(string text)
+    {
+        var directives = new List<string>();
+        using var reader = new StringReader(text);
+        while (reader.ReadLine() is { } line)
+        {
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("#define ", StringComparison.Ordinal) ||
+                trimmed.StartsWith("#undef ", StringComparison.Ordinal))
+            {
+                directives.Add(trimmed);
+            }
+        }
+
+        return directives;
     }
 
     private static string AddBodyLineDirective(string body, FunctionSymbol function)

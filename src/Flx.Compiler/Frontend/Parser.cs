@@ -174,7 +174,17 @@ internal sealed class Parser
     private string ParseTypeName(string message)
     {
         if (Current.Kind is TokenKind.Identifier or TokenKind.VoidKeyword)
-            return Advance().Text;
+        {
+            var first = Advance().Text;
+            if (Current.Kind == TokenKind.Dot)
+            {
+                Advance();
+                var second = ExpectIdentifier("expected identifier after '.'.");
+                return $"{first}.{second.Text}";
+            }
+
+            return first;
+        }
 
         _diagnostics.Report("FLX0008", message, Current.Location);
         Advance();

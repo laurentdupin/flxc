@@ -23,15 +23,32 @@ internal static class CTypeNames
         return builder.ToString();
     }
 
-    public static string MapType(string sourceType, CompilationModel model)
+    public static string MapType(string sourceType, CompilationModel? model, ModuleSymbol? module = null)
     {
         if (sourceType == "string")
             return "flx_string";
 
-        if (sourceType is "usize" or "i32" or "void")
-            return sourceType;
+        if (sourceType == "i32")
+            return "int";
 
-        if (model.PrefabsByName.ContainsKey(sourceType))
+        if (sourceType == "usize")
+            return "size_t";
+
+        if (sourceType == "void")
+            return "void";
+
+        var dotIndex = sourceType.IndexOf('.', StringComparison.Ordinal);
+        if (dotIndex > 0)
+        {
+            var alias = sourceType[..dotIndex];
+            var member = sourceType[(dotIndex + 1)..];
+            if (module is null || module.CImportsByAlias.ContainsKey(alias))
+                return member;
+
+            return sourceType;
+        }
+
+        if (model is not null && model.PrefabsByName.ContainsKey(sourceType))
             return ViewType(sourceType);
 
         return sourceType;
@@ -48,7 +65,7 @@ internal static class CTypeNames
 
     public static string FormatFunctionParameters(FunctionSymbol function, CompilationModel model)
     {
-        var parameters = function.Parameters.Select(parameter => $"{MapType(parameter.Type, model)} {parameter.Name}").ToList();
+        var parameters = function.Parameters.Select(parameter => $"{MapType(parameter.Type, model, function.Module)} {parameter.Name}").ToList();
 
         if (function.NeedsWorld)
             parameters.Insert(0, "flx_world *world");
@@ -58,6 +75,6 @@ internal static class CTypeNames
 
     public static string FormatExternPrototype(FunctionSymbol function, CompilationModel model)
     {
-        return $"extern {MapType(function.ReturnType, model)} {function.MangledName}({FormatFunctionParameters(function, model)});";
+        return $"extern {MapType(function.ReturnType, model, function.Module)} {function.MangledName}({FormatFunctionParameters(function, model)});";
     }
 }

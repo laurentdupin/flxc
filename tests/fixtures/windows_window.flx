@@ -1,0 +1,61 @@
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+
+import c "windows.h" as windows
+
+windows.LRESULT WindowProc(
+    windows.HWND hwnd,
+    windows.UINT message,
+    windows.WPARAM wParam,
+    windows.LPARAM lParam
+) {
+    switch (message) {
+        case windows.WM_DESTROY:
+            windows.PostQuitMessage(0);
+            return 0;
+    }
+
+    return windows.DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+void CreateMainWindow() {
+    windows.HINSTANCE instance = windows.GetModuleHandleW(null);
+
+    windows.WNDCLASSW windowClass = { 0 };
+    windowClass.lpfnWndProc = WindowProc;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = L"FlxWindowClass";
+
+    windows.RegisterClassW(&windowClass);
+
+    windows.HWND hwnd = windows.CreateWindowExW(
+        0,
+        L"FlxWindowClass",
+        L"Hello from FLX",
+        windows.WS_OVERLAPPEDWINDOW,
+        windows.CW_USEDEFAULT,
+        windows.CW_USEDEFAULT,
+        800,
+        600,
+        null,
+        null,
+        instance,
+        null
+    );
+
+    windows.ShowWindow(hwnd, windows.SW_SHOW);
+}
+
+void PumpMessages() {
+    windows.MSG message;
+
+    while (windows.GetMessageW(&message, null, 0, 0) > 0) {
+        windows.TranslateMessage(&message);
+        windows.DispatchMessageW(&message);
+    }
+}
+
+schedule {
+    run CreateMainWindow;
+    run PumpMessages;
+}
