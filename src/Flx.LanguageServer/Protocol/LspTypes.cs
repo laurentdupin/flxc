@@ -37,6 +37,12 @@ internal sealed record LspPosition(int Line, int Character);
 
 internal sealed record LspRange(LspPosition Start, LspPosition End);
 
+internal sealed class LspLocation
+{
+    public required string Uri { get; init; }
+    public required LspRange Range { get; init; }
+}
+
 internal sealed class LspDiagnostic
 {
     public required LspRange Range { get; init; }
@@ -110,6 +116,15 @@ internal sealed class DocumentSymbolParams
     public TextDocumentIdentifier TextDocument { get; set; } = new();
 }
 
+internal sealed class TextDocumentPositionParams
+{
+    [JsonPropertyName("textDocument")]
+    public TextDocumentIdentifier TextDocument { get; set; } = new();
+
+    [JsonPropertyName("position")]
+    public LspPosition Position { get; set; } = new(0, 0);
+}
+
 internal sealed record OpenDocumentState(string Uri, string Path, string Text);
 
 internal static class LspTypeConversions
@@ -137,6 +152,15 @@ internal static class LspTypeConversions
             Range = range,
             SelectionRange = range,
             Children = []
+        };
+    }
+
+    public static LspLocation ToLspLocation(FlxDefinitionResult definition)
+    {
+        return new LspLocation
+        {
+            Uri = new Uri(Path.GetFullPath(definition.Path)).AbsoluteUri,
+            Range = ToLspRange(definition.Range)
         };
     }
 

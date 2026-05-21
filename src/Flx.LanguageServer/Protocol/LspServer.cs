@@ -114,6 +114,11 @@ internal sealed class LspServer
                     await HandleDocumentSymbolAsync(connection, id.Value, ReadParams<DocumentSymbolParams>(root), cancellationToken);
                 return false;
 
+            case "textDocument/definition":
+                if (id is not null)
+                    await HandleDefinitionAsync(connection, id.Value, ReadParams<TextDocumentPositionParams>(root), cancellationToken);
+                return false;
+
             case "workspace/didChangeWatchedFiles":
                 await HandleDidChangeWatchedFilesAsync(connection, cancellationToken);
                 return false;
@@ -132,7 +137,7 @@ internal sealed class LspServer
     {
         var path = UriToPath(parameters.TextDocument.Uri);
         _openDocumentsByPath[path] = new OpenDocumentState(parameters.TextDocument.Uri, path, parameters.TextDocument.Text);
-        await LogAsync("didOpen " + path);
+        await LogAsync($"didOpen {path} from {parameters.TextDocument.Uri}");
         await AnalyzeAndPublishDiagnosticsAsync(connection, path, cancellationToken);
     }
 
@@ -180,6 +185,23 @@ internal sealed class LspServer
 
         await LogAsync($"documentSymbol {path}: {symbols.Length}");
         await SendResultAsync(connection, id, symbols, cancellationToken);
+    }
+
+    private async Task HandleDefinitionAsync(
+        LspConnection connection,
+        JsonElement id,
+        TextDocumentPositionParams parameters,
+        CancellationToken cancellationToken)
+    {
+        var path = UriToPath(parameters.TextDocument.Uri);
+        var snapshot = Analyze(path);
+        var definition = snapshot.FindDefinition(path, parameters.Position.Line, parameters.Position.Character);
+        var result = definition is null || !File.Exists(definition.Path)
+            ? null
+            : LspTypeConversions.ToLspLocation(definition);
+
+        await LogAsync($"definition {path}:{parameters.Position.Line}:{parameters.Position.Character}: {(result is null ? "none" : definition!.Path)}");
+        await SendResultAsync(connection, id, result, cancellationToken);
     }
 
     private async Task HandleDidChangeWatchedFilesAsync(
@@ -249,7 +271,8 @@ internal sealed class LspServer
                     openClose = true,
                     change = TextDocumentSyncKind.Full
                 },
-                documentSymbolProvider = true
+                documentSymbolProvider = true,
+                definitionProvider = true
             },
             serverInfo = new
             {
@@ -325,7 +348,21 @@ internal sealed class LspServer
 
     private static string UriToPath(string uri)
     {
-        return Path.GetFullPath(new Uri(uri).LocalPath);
+        var localPath = new Uri(uri).LocalPath;
+        if (localPath.Length >= 3 &&
+            IsDirectorySeparator(localPath[0]) &&
+            char.IsLetter(localPath[1]) &&
+            localPath[2] == ':')
+        {
+            localPath = localPath[1..];
+        }
+
+        return Path.GetFullPath(localPath);
+    }
+
+    private static bool IsDirectorySeparator(char value)
+    {
+        return value is '/' or '\\';
     }
 
     private Task LogAsync(string message)

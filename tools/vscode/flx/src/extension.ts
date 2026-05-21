@@ -13,7 +13,8 @@ let client: LanguageClient | undefined;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("flx");
   const configuredPath = config.get<string>("languageServer.path") ?? "";
-  const logPath = config.get<string>("languageServer.log") ?? "";
+  const configuredLogPath = config.get<string>("languageServer.log") ?? "";
+  const logPath = resolveLogPath(context, configuredLogPath);
   const serverPath = resolveServerPath(context, configuredPath);
 
   if (!serverPath) {
@@ -24,9 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const args = ["--stdio"];
-  if (logPath.length > 0) {
-    args.push("--log", logPath);
-  }
+  args.push("--log", logPath);
 
   const serverOptions: ServerOptions = {
     run: {
@@ -91,6 +90,16 @@ function resolveServerPath(
   }
 
   return findOnPath(process.platform === "win32" ? "flx-lsp.exe" : "flx-lsp");
+}
+
+function resolveLogPath(context: vscode.ExtensionContext, configuredPath: string): string {
+  if (configuredPath.length > 0) {
+    return configuredPath;
+  }
+
+  const directory = context.globalStorageUri.fsPath;
+  fs.mkdirSync(directory, { recursive: true });
+  return path.join(directory, "flx-lsp.log");
 }
 
 function fileExists(filePath: string): boolean {

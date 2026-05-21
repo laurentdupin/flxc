@@ -17,13 +17,28 @@ if (arguments.Contains("--smoke", StringComparer.Ordinal))
         return 2;
     }
 
-    return await RunSmokeAsync(arguments[index + 1]);
+    return await RunSmokeAsync(arguments[index + 1], null);
+}
+
+if (arguments.Contains("--smoke-definition", StringComparer.Ordinal))
+{
+    var index = arguments.IndexOf("--smoke-definition");
+    if (index + 3 >= arguments.Count ||
+        !int.TryParse(arguments[index + 2], out var line) ||
+        !int.TryParse(arguments[index + 3], out var character))
+    {
+        Console.Error.WriteLine("usage: flx-lsp --smoke-definition <file.flx> <zero-based-line> <zero-based-character>");
+        return 2;
+    }
+
+    return await RunSmokeAsync(arguments[index + 1], new SmokeDefinitionPosition(line, character));
 }
 
 if (!arguments.Contains("--stdio", StringComparer.Ordinal))
 {
     Console.Error.WriteLine("usage: flx-lsp --stdio [--log <path>]");
     Console.Error.WriteLine("       flx-lsp --smoke <file.flx>");
+    Console.Error.WriteLine("       flx-lsp --smoke-definition <file.flx> <zero-based-line> <zero-based-character>");
     return 2;
 }
 
@@ -37,7 +52,7 @@ static async Task<int> RunStdioAsync(string? logPath)
     return 0;
 }
 
-static async Task<int> RunSmokeAsync(string filePath)
+static async Task<int> RunSmokeAsync(string filePath, SmokeDefinitionPosition? definitionPosition)
 {
     var fullPath = Path.GetFullPath(filePath);
     var uri = new Uri(fullPath).AbsoluteUri;
@@ -79,10 +94,35 @@ static async Task<int> RunSmokeAsync(string filePath)
             }
         }
     });
+
+    var shutdownId = 3;
+    if (definitionPosition is not null)
+    {
+        await WriteFrameAsync(input, new
+        {
+            jsonrpc = "2.0",
+            id = 3,
+            method = "textDocument/definition",
+            @params = new
+            {
+                textDocument = new
+                {
+                    uri
+                },
+                position = new
+                {
+                    line = definitionPosition.Line,
+                    character = definitionPosition.Character
+                }
+            }
+        });
+        shutdownId = 4;
+    }
+
     await WriteFrameAsync(input, new
     {
         jsonrpc = "2.0",
-        id = 3,
+        id = shutdownId,
         method = "shutdown",
         @params = new { }
     });
@@ -137,3 +177,5 @@ static async Task WriteFrameAsync(Stream stream, object message)
     await stream.WriteAsync(header);
     await stream.WriteAsync(body);
 }
+
+internal sealed record SmokeDefinitionPosition(int Line, int Character);
