@@ -93,17 +93,17 @@ internal static class CBodyRewriter
 
         var memberStart = afterDotWhitespace;
         var memberEnd = ReadIdentifier(body, memberStart);
-        var memberName = body[memberStart..memberEnd];
         var afterMemberWhitespace = SkipWhitespace(body, memberEnd);
 
-        if (afterMemberWhitespace >= body.Length || body[afterMemberWhitespace] != '(')
-            return false;
-
-        if (memberName is "c_str" or "length" or "empty" or "clone")
-            return false;
-
         var alias = body[identifierStart..identifierEnd];
-        if (!importsByAlias.ContainsKey(alias))
+        if (importsByAlias.ContainsKey(alias))
+        {
+            output.Append(body[memberStart..memberEnd]);
+            position = memberEnd;
+            return true;
+        }
+
+        if (afterMemberWhitespace < body.Length && body[afterMemberWhitespace] == '(')
         {
             diagnostics?.Report("FLX0200", $"unknown C import alias '{alias}'.", source.GetLocation(bodyStart + identifierStart));
             output.Append(body[identifierStart..memberEnd]);
@@ -111,9 +111,7 @@ internal static class CBodyRewriter
             return true;
         }
 
-        output.Append(body[memberStart..memberEnd]);
-        position = memberEnd;
-        return true;
+        return false;
     }
 
     private static bool IsMemberChainSegment(string body, int identifierStart)

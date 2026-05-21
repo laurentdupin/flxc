@@ -154,5 +154,7 @@ internal sealed class CompilationModel
                                    FunctionRegistry.AllFunctions.Any(function => function.NeedsWorld ||
                                        function.Parameters.Any(parameter => PrefabsByName.ContainsKey(parameter.Type)) ||
                                        function.Syntax.BodyText.Contains("string", StringComparison.Ordinal) ||
-                                       function.Syntax.BodyText.Contains("Array<", StringComparison.Ordinal));
+                                       function.Syntax.BodyText.Contains("Array<", StringComparison.Ordinal) ||
+                                       function.Syntax.BodyText.Contains("i32 ", StringComparison.Ordinal) ||
+                                       function.Syntax.BodyText.Contains("usize ", StringComparison.Ordinal));
 }

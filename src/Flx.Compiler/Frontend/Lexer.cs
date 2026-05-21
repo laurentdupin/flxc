@@ -47,6 +47,14 @@ internal sealed class Lexer
         if (current == '\'')
             return ReadCharLiteral();
 
+        if (current == '#')
+        {
+            _diagnostics.Report("FLX0401", "unexpected preprocessor directive after preprocessing.", location);
+            while (!IsAtEnd && Current is not '\r' and not '\n')
+                _position++;
+            return NextToken();
+        }
+
         _position++;
 
         return current switch

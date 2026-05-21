@@ -1,0 +1,11 @@
+#define MESSAGE "Hello from macro\n"
+
+import c "stdio.h" as stdio
+
+void HelloMacro() {
+    stdio.printf(MESSAGE);
+}
+
+schedule {
+    run HelloMacro;
+}

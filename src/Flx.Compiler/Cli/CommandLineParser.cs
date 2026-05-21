@@ -49,9 +49,27 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (arg == "--emit-pp")
+            {
+                options.EmitPreprocessed = true;
+                continue;
+            }
+
             if (arg == "--keep-c")
             {
                 options.KeepC = true;
+                continue;
+            }
+
+            if (arg == "--keep-pp")
+            {
+                options.KeepPreprocessed = true;
+                continue;
+            }
+
+            if (arg == "--no-preprocess")
+            {
+                options.NoPreprocess = true;
                 continue;
             }
 
@@ -109,6 +127,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (TryReadLongOptionValue(args, ref i, arg, "--ppflag", diagnostics, out var ppflag))
+            {
+                options.PreprocessorFlags.Add(ppflag);
+                continue;
+            }
+
             if (TryReadShortOptionValue(args, ref i, arg, "-I", diagnostics, out var includeDir))
             {
                 options.IncludeDirs.Add(includeDir);
@@ -130,6 +154,12 @@ internal static class CommandLineParser
             if (TryReadShortOptionValue(args, ref i, arg, "-D", diagnostics, out var define))
             {
                 options.Defines.Add(define);
+                continue;
+            }
+
+            if (TryReadShortOptionValue(args, ref i, arg, "-U", diagnostics, out var undefine))
+            {
+                options.Undefines.Add(undefine);
                 continue;
             }
 

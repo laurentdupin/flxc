@@ -1,0 +1,13 @@
+import c "stdio.h" as stdio
+
+#ifndef VALUE
+#define VALUE 7
+#endif
+
+void PrintValue() {
+    stdio.printf("%d\n", VALUE);
+}
+
+schedule {
+    run PrintValue;
+}

@@ -1,0 +1,12 @@
+#define WIN32_LEAN_AND_MEAN
+
+import c "windows.h" as windows
+import c "stdio.h" as stdio
+
+void PrintWindowsConst() {
+    stdio.printf("%d\n", windows.WM_DESTROY);
+}
+
+schedule {
+    run PrintWindowsConst;
+}

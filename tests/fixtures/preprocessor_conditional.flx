@@ -1,0 +1,17 @@
+#define USE_A 1
+
+import c "stdio.h" as stdio
+
+#if USE_A
+void Choose() {
+    stdio.printf("A\n");
+}
+#else
+void Choose() {
+    stdio.printf("B\n");
+}
+#endif
+
+schedule {
+    run Choose;
+}

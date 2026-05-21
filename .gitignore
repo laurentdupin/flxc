@@ -32,6 +32,8 @@ bld/
 [Ll]og/
 [Ll]ogs/
 build/
+!src/Flx.Compiler/Build/
+!src/Flx.Compiler/Build/*.cs
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
