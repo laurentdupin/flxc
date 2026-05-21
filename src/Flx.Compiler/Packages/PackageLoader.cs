@@ -23,6 +23,12 @@ internal sealed class PackageLoader
     private readonly List<LoadedPackage> _orderedPackages = [];
     private readonly List<LoadedBinaryPackage> _binaryPackages = [];
     private readonly Stack<string> _loadStack = new();
+    private readonly bool _validateBinaryArtifacts;
+
+    public PackageLoader(bool validateBinaryArtifacts = true)
+    {
+        _validateBinaryArtifacts = validateBinaryArtifacts;
+    }
 
     public PackageGraph? Load(string manifestPath, DiagnosticBag diagnostics)
     {
@@ -194,13 +200,13 @@ internal sealed class PackageLoader
 
         foreach (var header in metadata.Headers.Where(header => !string.IsNullOrWhiteSpace(header)))
         {
-            if (!HeaderExists(header, includeDirs))
+            if (_validateBinaryArtifacts && !HeaderExists(header, includeDirs))
                 diagnostics.Report("FLX0612", $"binary package '{metadata.Name}' references missing public header '{header}'.");
         }
 
         foreach (var library in libraries)
         {
-            if (!File.Exists(library))
+            if (_validateBinaryArtifacts && !File.Exists(library))
                 diagnostics.Report("FLX0613", $"binary package '{metadata.Name}' references missing library '{library}'.");
         }
 
