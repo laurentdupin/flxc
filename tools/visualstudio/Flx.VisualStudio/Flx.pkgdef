@@ -1,0 +1,5 @@
+[$RootKey$\TextMate\Repositories]
+"FLX"="$PackageFolder$\Grammars"
+
+[$RootKey$\TextMate\LanguageConfiguration\GrammarMapping]
+"source.flx"="$PackageFolder$\flx-language-configuration.json"

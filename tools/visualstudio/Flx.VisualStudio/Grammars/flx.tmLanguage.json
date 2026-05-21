@@ -1,0 +1,112 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "FLX",
+  "scopeName": "source.flx",
+  "fileTypes": ["flx"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#preprocessor" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#numbers" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.flx",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.flx",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.flx",
+          "match": "^\\s*#\\s*(define|undef|if|ifdef|ifndef|elif|else|endif|error|warning|pragma)\\b.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.flx",
+          "begin": "L?\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.flx",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.flx",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.flx",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flx",
+          "match": "\\b(if|else|switch|case|default|for|while|do|break|continue|return|goto|breakloop)\\b"
+        },
+        {
+          "name": "keyword.declaration.flx",
+          "match": "\\b(import|c|as|component|prefab|abstract|tag|flatten|schedule|run|loopto|jumpto|consumeevents|oncreate|ondestroy|side|create|destroy|extends|is)\\b"
+        },
+        {
+          "name": "storage.modifier.flx",
+          "match": "\\b(const|mut|static|extern|export|inline|unsafe)\\b"
+        },
+        {
+          "name": "constant.language.flx",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.primitive.flx",
+          "match": "\\b(void|bool|char|short|int|long|float|double|i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|usize|isize|string)\\b"
+        },
+        {
+          "name": "support.type.container.flx",
+          "match": "\\b(Array|DynArray|FixedArray|Object)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.flx",
+          "match": "\\b(0x[0-9a-fA-F]+|[0-9]+(\\.[0-9]+)?([fF])?)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.flx",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()"
+        }
+      ]
+    }
+  }
+}

@@ -22,6 +22,14 @@ The projects are normal Visual Studio C++ application projects. They import:
 
 The example projects are pinned to the VS 2026 C++ toolset `v145`. Retarget the project to `v143` if you are using Visual Studio 2022.
 
+Each project also includes a `.vcxproj.filters` file that places explicitly listed `.flx` files under:
+
+```text
+FLX Source Files
+```
+
+Generated C remains under `$(IntDir)\flx` and is not shown as user source in Solution Explorer.
+
 `FlxHello` builds a console executable.
 
 `FlxWindow` builds a native Win32 window executable and links:
@@ -32,3 +40,9 @@ Gdi32.lib
 ```
 
 Set the project as the startup project and press F5 to build and debug with the native Visual Studio debugger.
+
+For basic `.flx` syntax coloring and editor behavior, build and install the VSIX in:
+
+```text
+..\..\tools\visualstudio\Flx.VisualStudio
+```

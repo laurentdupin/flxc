@@ -57,3 +57,9 @@ Useful project properties:
 - Debugging is native C-level. `#line` directives give best-effort mapping back to `.flx`.
 - Generated C is kept under `$(IntDir)\flx`.
 - Incremental generation is intentionally simple for now; FLX C is regenerated before C compilation.
+
+For basic `.flx` syntax coloring, comments, bracket matching, and indentation, see:
+
+```text
+tools\visualstudio\Flx.VisualStudio
+```
