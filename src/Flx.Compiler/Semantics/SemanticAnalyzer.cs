@@ -33,6 +33,9 @@ internal sealed class SemanticAnalyzer
             BindPrefabs(module, model);
 
         foreach (var module in model.Modules)
+            BindGlobals(module.Syntax, module, model);
+
+        foreach (var module in model.Modules)
             BindFunctions(module.Syntax, module, model, model.FunctionRegistry);
 
         CheckSchedules(model, requireSchedule, validateScheduleTargets);
@@ -177,6 +180,24 @@ internal sealed class SemanticAnalyzer
         }
     }
 
+    private void BindGlobals(CompilationUnitSyntax unit, ModuleSymbol module, CompilationModel model)
+    {
+        foreach (var global in unit.Globals)
+        {
+            CheckTypeAlias(global.Type, module, global.DeclarationLocation);
+
+            if (model.GlobalsByName.ContainsKey(global.Name))
+            {
+                _diagnostics.Report("FLX0110", $"duplicate global variable '{global.Name}'.", global.NameLocation);
+                continue;
+            }
+
+            var symbol = new GlobalVariableSymbol(module, unit.Source, global, global.Type, global.Name, global.Initializer, global.NameLocation);
+            module.Globals.Add(symbol);
+            model.GlobalsByName.Add(symbol.Name, symbol);
+        }
+    }
+
     private void CheckTypeAlias(string typeName, ModuleSymbol module, SourceLocation location)
     {
         var dotIndex = typeName.IndexOf('.', StringComparison.Ordinal);
@@ -211,10 +232,14 @@ internal sealed class SemanticAnalyzer
 
         foreach (var step in model.Schedules[0].Steps)
         {
-            var overloads = model.FunctionRegistry.LookupSourceName(step.Name);
+            if (step is LabelStepSyntax or LoopToStepSyntax)
+                continue;
+
+            var runStep = (RunStepSyntax)step;
+            var overloads = model.FunctionRegistry.LookupSourceName(runStep.Name);
             if (overloads.Count == 0)
             {
-                _diagnostics.Report("FLX0101", $"run target '{step.Name}' does not exist.", step.Location);
+                _diagnostics.Report("FLX0101", $"run target '{runStep.Name}' does not exist.", runStep.Location);
                 continue;
             }
 
@@ -222,9 +247,27 @@ internal sealed class SemanticAnalyzer
             {
                 _diagnostics.Report(
                     "FLX0104",
-                    $"run {step.Name} includes overload {FormatSignature(overload.SourceName, overload.Parameters)}, but object-parameter systems are not implemented yet.",
-                    step.Location);
+                    $"run {runStep.Name} includes overload {FormatSignature(overload.SourceName, overload.Parameters)}, but object-parameter systems are not implemented yet.",
+                    runStep.Location);
             }
+        }
+
+        CheckScheduleLabels(model.Schedules[0]);
+    }
+
+    private void CheckScheduleLabels(ScheduleDeclSyntax schedule)
+    {
+        var labels = new Dictionary<string, LabelStepSyntax>(StringComparer.Ordinal);
+        foreach (var label in schedule.Steps.OfType<LabelStepSyntax>())
+        {
+            if (!labels.TryAdd(label.Name, label))
+                _diagnostics.Report("FLX0111", $"duplicate schedule label '{label.Name}'.", label.Location);
+        }
+
+        foreach (var loopTo in schedule.Steps.OfType<LoopToStepSyntax>())
+        {
+            if (!labels.ContainsKey(loopTo.TargetLabel))
+                _diagnostics.Report("FLX0112", $"loopto target label '{loopTo.TargetLabel}' does not exist.", loopTo.Location);
         }
     }
 

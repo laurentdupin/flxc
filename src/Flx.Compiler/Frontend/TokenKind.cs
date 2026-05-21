@@ -13,6 +13,7 @@ internal enum TokenKind
     VoidKeyword,
     ScheduleKeyword,
     RunKeyword,
+    LoopToKeyword,
     ComponentKeyword,
     PrefabKeyword,
     LeftParen,
@@ -21,5 +22,6 @@ internal enum TokenKind
     RightBrace,
     Comma,
     Semicolon,
-    Dot
+    Dot,
+    Colon
 }

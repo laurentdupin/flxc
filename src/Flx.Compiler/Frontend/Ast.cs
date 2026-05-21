@@ -13,6 +13,7 @@ internal sealed class CompilationUnitSyntax
     public List<CImportSyntax> CImports { get; } = [];
     public List<ComponentDeclSyntax> Components { get; } = [];
     public List<PrefabDeclSyntax> Prefabs { get; } = [];
+    public List<GlobalVariableDeclSyntax> Globals { get; } = [];
     public List<FunctionDeclSyntax> Functions { get; } = [];
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
 }
@@ -56,6 +57,29 @@ internal sealed class FunctionDeclSyntax
     public IReadOnlyList<ParameterSyntax> Parameters { get; }
     public string BodyText { get; }
     public int BodyStart { get; }
+    public SourceLocation DeclarationLocation { get; }
+    public SourceLocation NameLocation { get; }
+}
+
+internal sealed class GlobalVariableDeclSyntax
+{
+    public GlobalVariableDeclSyntax(
+        string type,
+        string name,
+        string? initializer,
+        SourceLocation declarationLocation,
+        SourceLocation nameLocation)
+    {
+        Type = type;
+        Name = name;
+        Initializer = initializer;
+        DeclarationLocation = declarationLocation;
+        NameLocation = nameLocation;
+    }
+
+    public string Type { get; }
+    public string Name { get; }
+    public string? Initializer { get; }
     public SourceLocation DeclarationLocation { get; }
     public SourceLocation NameLocation { get; }
 }
@@ -112,24 +136,55 @@ internal sealed class ParameterSyntax
 
 internal sealed class ScheduleDeclSyntax
 {
-    public ScheduleDeclSyntax(IReadOnlyList<RunStepSyntax> steps, SourceLocation location)
+    public ScheduleDeclSyntax(IReadOnlyList<ScheduleStmtSyntax> steps, SourceLocation location)
     {
         Steps = steps;
         Location = location;
     }
 
-    public IReadOnlyList<RunStepSyntax> Steps { get; }
+    public IReadOnlyList<ScheduleStmtSyntax> Steps { get; }
     public SourceLocation Location { get; }
 }
 
-internal sealed class RunStepSyntax
+internal abstract class ScheduleStmtSyntax
 {
-    public RunStepSyntax(string name, SourceLocation location)
+    protected ScheduleStmtSyntax(SourceLocation location)
     {
-        Name = name;
         Location = location;
     }
 
-    public string Name { get; }
     public SourceLocation Location { get; }
+}
+
+internal sealed class RunStepSyntax : ScheduleStmtSyntax
+{
+    public RunStepSyntax(string name, SourceLocation location)
+        : base(location)
+    {
+        Name = name;
+    }
+
+    public string Name { get; }
+}
+
+internal sealed class LabelStepSyntax : ScheduleStmtSyntax
+{
+    public LabelStepSyntax(string name, SourceLocation location)
+        : base(location)
+    {
+        Name = name;
+    }
+
+    public string Name { get; }
+}
+
+internal sealed class LoopToStepSyntax : ScheduleStmtSyntax
+{
+    public LoopToStepSyntax(string targetLabel, SourceLocation location)
+        : base(location)
+    {
+        TargetLabel = targetLabel;
+    }
+
+    public string TargetLabel { get; }
 }

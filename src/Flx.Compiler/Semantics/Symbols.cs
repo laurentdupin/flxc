@@ -127,6 +127,35 @@ internal sealed class FunctionSymbol
     public bool NeedsWorld => Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
 }
 
+internal sealed class GlobalVariableSymbol
+{
+    public GlobalVariableSymbol(
+        ModuleSymbol module,
+        SourceFile sourceFile,
+        GlobalVariableDeclSyntax syntax,
+        string type,
+        string name,
+        string? initializer,
+        SourceLocation location)
+    {
+        Module = module;
+        SourceFile = sourceFile;
+        Syntax = syntax;
+        Type = type;
+        Name = name;
+        Initializer = initializer;
+        Location = location;
+    }
+
+    public ModuleSymbol Module { get; }
+    public SourceFile SourceFile { get; }
+    public GlobalVariableDeclSyntax Syntax { get; }
+    public string Type { get; }
+    public string Name { get; }
+    public string? Initializer { get; }
+    public SourceLocation Location { get; }
+}
+
 internal sealed class ModuleSymbol
 {
     public ModuleSymbol(SourceFile sourceFile, CompilationUnitSyntax syntax)
@@ -141,6 +170,7 @@ internal sealed class ModuleSymbol
     public Dictionary<string, CImportSymbol> CImportsByAlias { get; } = new(StringComparer.Ordinal);
     public List<ComponentSymbol> Components { get; } = [];
     public List<PrefabSymbol> Prefabs { get; } = [];
+    public List<GlobalVariableSymbol> Globals { get; } = [];
     public List<FunctionSymbol> Functions { get; } = [];
 }
 
@@ -148,6 +178,7 @@ internal sealed class CompilationModel
 {
     public List<ModuleSymbol> Modules { get; } = [];
     public FunctionRegistry FunctionRegistry { get; } = new();
+    public Dictionary<string, GlobalVariableSymbol> GlobalsByName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, ComponentSymbol> ComponentsByName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, PrefabSymbol> PrefabsByName { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
@@ -160,4 +191,6 @@ internal sealed class CompilationModel
                                        function.Syntax.BodyText.Contains("Array<", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("i32 ", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("usize ", StringComparison.Ordinal));
+    public bool RequiresScheduleBreakSupport => Schedules.Any(schedule => schedule.Steps.OfType<LoopToStepSyntax>().Any()) ||
+                                                FunctionRegistry.AllFunctions.Any(function => function.Syntax.BodyText.Contains("breakloop", StringComparison.Ordinal));
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
+using Flx.Compiler.Frontend;
 using Flx.Compiler.Semantics;
 
 namespace Flx.Compiler.Metadata;
@@ -60,15 +61,22 @@ internal static class MetadataWriter
         {
             metadata.Schedule = new ScheduleMetadata
             {
-                Steps = module.Syntax.Schedules.SelectMany(schedule => schedule.Steps).Select(step => new ScheduleStepMetadata
-                {
-                    Kind = "run",
-                    Name = step.Name
-                }).ToList()
+                Steps = module.Syntax.Schedules.SelectMany(schedule => schedule.Steps).Select(ToMetadataStep).ToList()
             };
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, JsonOptions));
+    }
+
+    private static ScheduleStepMetadata ToMetadataStep(ScheduleStmtSyntax step)
+    {
+        return step switch
+        {
+            RunStepSyntax run => new ScheduleStepMetadata { Kind = "run", Name = run.Name },
+            LabelStepSyntax label => new ScheduleStepMetadata { Kind = "label", Name = label.Name },
+            LoopToStepSyntax loopTo => new ScheduleStepMetadata { Kind = "loopto", Name = loopTo.TargetLabel },
+            _ => new ScheduleStepMetadata { Kind = "unknown", Name = "" }
+        };
     }
 }

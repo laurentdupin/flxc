@@ -38,7 +38,7 @@ internal sealed class Parser
                     break;
                 case TokenKind.VoidKeyword:
                 case TokenKind.Identifier:
-                    unit.Functions.Add(ParseFunction());
+                    ParseFunctionOrGlobal(unit);
                     break;
                 default:
                     _diagnostics.Report("FLX0001", "expected import, function, or schedule declaration.", Current.Location);
@@ -80,18 +80,43 @@ internal sealed class Parser
         return new PrefabDeclSyntax(name.Text, bodyText, bodyStart, prefabToken.Location, name.Location);
     }
 
-    private FunctionDeclSyntax ParseFunction()
+    private void ParseFunctionOrGlobal(CompilationUnitSyntax unit)
     {
         var returnType = ParseTypeName("expected function return type.");
         var declarationLocation = Previous.Location;
         var name = ExpectIdentifier("expected function name.");
-        Expect(TokenKind.LeftParen, "expected '(' after function name.");
-        var parameters = ParseParameterList();
-        Expect(TokenKind.RightParen, "expected ')' after function parameters.");
 
-        var (bodyText, bodyStart) = ParseRawBlock("expected function body.", "unterminated function body.");
+        if (Current.Kind == TokenKind.LeftParen)
+        {
+            Advance();
+            var parameters = ParseParameterList();
+            Expect(TokenKind.RightParen, "expected ')' after function parameters.");
+            var (bodyText, bodyStart) = ParseRawBlock("expected function body.", "unterminated function body.");
+            unit.Functions.Add(new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location));
+            return;
+        }
 
-        return new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location);
+        var initializer = ParseOptionalGlobalInitializer();
+        Expect(TokenKind.Semicolon, "expected ';' after global variable declaration.");
+        unit.Globals.Add(new GlobalVariableDeclSyntax(returnType, name.Text, initializer, declarationLocation, name.Location));
+    }
+
+    private string? ParseOptionalGlobalInitializer()
+    {
+        if (Current.Kind != TokenKind.Unknown || Current.Text != "=")
+            return null;
+
+        var initializerStart = Current.End;
+        Advance();
+        var initializerEnd = initializerStart;
+
+        while (Current.Kind != TokenKind.Semicolon && Current.Kind != TokenKind.EndOfFile)
+        {
+            initializerEnd = Current.End;
+            Advance();
+        }
+
+        return _source.Text[initializerStart..initializerEnd].Trim();
     }
 
     private (string BodyText, int BodyStart) ParseRawBlock(string expectedMessage, string unterminatedMessage)
@@ -150,21 +175,42 @@ internal sealed class Parser
     {
         var scheduleToken = Expect(TokenKind.ScheduleKeyword, "expected 'schedule'.");
         Expect(TokenKind.LeftBrace, "expected '{' after schedule.");
-        var steps = new List<RunStepSyntax>();
+        var steps = new List<ScheduleStmtSyntax>();
 
         while (Current.Kind != TokenKind.RightBrace && Current.Kind != TokenKind.EndOfFile)
         {
+            if (Current.Kind == TokenKind.RunKeyword)
+            {
+                Advance();
+                var target = ExpectIdentifier("expected run target name.");
+                steps.Add(new RunStepSyntax(target.Text, target.Location));
+                Expect(TokenKind.Semicolon, "expected ';' after run statement.");
+                continue;
+            }
+
+            if (Current.Kind == TokenKind.LoopToKeyword)
+            {
+                Advance();
+                var target = ExpectIdentifier("expected loop target label.");
+                steps.Add(new LoopToStepSyntax(target.Text, target.Location));
+                Expect(TokenKind.Semicolon, "expected ';' after loopto statement.");
+                continue;
+            }
+
+            if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Colon)
+            {
+                var label = Advance();
+                Advance();
+                steps.Add(new LabelStepSyntax(label.Text, label.Location));
+                continue;
+            }
+
             if (Current.Kind != TokenKind.RunKeyword)
             {
                 _diagnostics.Report("FLX0007", "expected schedule statement.", Current.Location);
                 Advance();
                 continue;
             }
-
-            Advance();
-            var target = ExpectIdentifier("expected run target name.");
-            steps.Add(new RunStepSyntax(target.Text, target.Location));
-            Expect(TokenKind.Semicolon, "expected ';' after run statement.");
         }
 
         Expect(TokenKind.RightBrace, "expected '}' after schedule.");
@@ -219,4 +265,5 @@ internal sealed class Parser
 
     private Token Current => _tokens[Math.Min(_position, _tokens.Count - 1)];
     private Token Previous => _tokens[Math.Clamp(_position - 1, 0, _tokens.Count - 1)];
+    private Token Peek(int offset) => _tokens[Math.Min(_position + offset, _tokens.Count - 1)];
 }

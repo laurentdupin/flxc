@@ -128,6 +128,13 @@ internal static class CBodyRewriter
             return true;
         }
 
+        if (identifier == "breakloop")
+        {
+            output.Append("flx_schedule_request_break()");
+            position = identifierEnd;
+            return true;
+        }
+
         if (functionRegistry is not null)
         {
             var matches = functionRegistry.LookupSourceName(identifier);

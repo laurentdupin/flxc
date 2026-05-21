@@ -66,6 +66,7 @@ internal sealed class Lexer
             ',' => new Token(TokenKind.Comma, ",", null, start, _position, location),
             ';' => new Token(TokenKind.Semicolon, ";", null, start, _position, location),
             '.' => new Token(TokenKind.Dot, ".", null, start, _position, location),
+            ':' => new Token(TokenKind.Colon, ":", null, start, _position, location),
             _ => UnknownToken(current, start, location)
         };
     }
@@ -90,6 +91,7 @@ internal sealed class Lexer
             "void" => TokenKind.VoidKeyword,
             "schedule" => TokenKind.ScheduleKeyword,
             "run" => TokenKind.RunKeyword,
+            "loopto" => TokenKind.LoopToKeyword,
             "component" => TokenKind.ComponentKeyword,
             "prefab" => TokenKind.PrefabKeyword,
             _ => TokenKind.Identifier

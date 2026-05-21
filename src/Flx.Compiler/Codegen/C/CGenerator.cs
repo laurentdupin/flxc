@@ -37,6 +37,21 @@ internal sealed class CGenerator
             builder.AppendLine();
         }
 
+        if (model.RequiresScheduleBreakSupport)
+        {
+            builder.AppendLine("extern int flx_schedule_break_requested;");
+            builder.AppendLine("static inline void flx_schedule_request_break(void) {");
+            builder.AppendLine("    flx_schedule_break_requested = 1;");
+            builder.AppendLine("}");
+            builder.AppendLine();
+        }
+
+        foreach (var global in module.Globals)
+            builder.AppendLine($"{CTypeNames.MapType(global.Type, model, module)} {global.Name}{FormatGlobalInitializer(global)};");
+
+        if (module.Globals.Count > 0)
+            builder.AppendLine();
+
         foreach (var function in module.Functions)
         {
             var rewrittenBody = new CBodyLowerer(function, module, model).Lower();
@@ -51,6 +66,19 @@ internal sealed class CGenerator
         }
 
         return builder.ToString();
+    }
+
+    private static string FormatGlobalInitializer(GlobalVariableSymbol global)
+    {
+        if (global.Initializer is not { Length: > 0 } initializer)
+            return "";
+
+        var rewritten = CBodyRewriter.Rewrite(
+            initializer,
+            global.Module.CImportsByAlias,
+            global.SourceFile,
+            global.Syntax.DeclarationLocation.Position);
+        return " = " + rewritten;
     }
 
     private static bool ModuleUsesSizeT(ModuleSymbol module)

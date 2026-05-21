@@ -26,6 +26,13 @@ internal sealed class CMainGenerator
             builder.AppendLine(CTypeNames.FormatExternPrototype(function, model));
 
         builder.AppendLine();
+
+        if (model.RequiresScheduleBreakSupport)
+        {
+            builder.AppendLine("int flx_schedule_break_requested = 0;");
+            builder.AppendLine();
+        }
+
         builder.AppendLine("int main(int argc, char **argv) {");
         builder.AppendLine("    (void)argc;");
         builder.AppendLine("    (void)argv;");
@@ -38,8 +45,8 @@ internal sealed class CMainGenerator
             builder.AppendLine();
         }
 
-        foreach (var function in calls)
-            AppendScheduleCall(builder, function, model);
+        foreach (var step in schedule.Steps)
+            AppendScheduleStep(builder, step, model);
 
         if (model.RequiresRuntime)
         {
@@ -56,7 +63,7 @@ internal sealed class CMainGenerator
 
     private static IEnumerable<FunctionSymbol> ResolveCalls(CompilationModel model, ScheduleDeclSyntax schedule)
     {
-        foreach (var step in schedule.Steps)
+        foreach (var step in schedule.Steps.OfType<RunStepSyntax>())
         {
             foreach (var function in model.FunctionRegistry
                          .LookupSourceName(step.Name)
@@ -69,6 +76,39 @@ internal sealed class CMainGenerator
                 yield return function;
             }
         }
+    }
+
+    private static void AppendScheduleStep(StringBuilder builder, ScheduleStmtSyntax step, CompilationModel model)
+    {
+        switch (step)
+        {
+            case RunStepSyntax run:
+                foreach (var function in ResolveRun(model, run))
+                    AppendScheduleCall(builder, function, model);
+                break;
+            case LabelStepSyntax label:
+                builder.AppendLine();
+                builder.AppendLine($"{FormatLabel(label.Name)}:");
+                break;
+            case LoopToStepSyntax loopTo:
+                builder.AppendLine();
+                builder.AppendLine("    if (!flx_schedule_break_requested) {");
+                builder.AppendLine($"        goto {FormatLabel(loopTo.TargetLabel)};");
+                builder.AppendLine("    }");
+                builder.AppendLine("    flx_schedule_break_requested = 0;");
+                break;
+        }
+    }
+
+    private static IEnumerable<FunctionSymbol> ResolveRun(CompilationModel model, RunStepSyntax step)
+    {
+        return model.FunctionRegistry
+            .LookupSourceName(step.Name)
+            .Where(function => function.Parameters.Count == 0 ||
+                               (function.Parameters.Count == 1 && model.PrefabsByName.ContainsKey(function.Parameters[0].Type)))
+            .OrderBy(function => function.SourceFile.DisplayPath, StringComparer.Ordinal)
+            .ThenBy(function => function.Location.Line)
+            .ThenBy(function => function.MangledName, StringComparer.Ordinal);
     }
 
     private static void AppendScheduleCall(StringBuilder builder, FunctionSymbol function, CompilationModel model)
@@ -86,4 +126,6 @@ internal sealed class CMainGenerator
         builder.AppendLine($"        {function.MangledName}({function.Parameters[0].Name});");
         builder.AppendLine("    }");
     }
+
+    private static string FormatLabel(string labelName) => "flx_schedule_label_" + CTypeNames.SafeIdentifier(labelName);
 }
