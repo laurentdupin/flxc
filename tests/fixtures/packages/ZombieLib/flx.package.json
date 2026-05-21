@@ -1,0 +1,11 @@
+{
+  "name": "ZombieLib",
+  "type": "library",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

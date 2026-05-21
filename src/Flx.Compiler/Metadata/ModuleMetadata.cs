@@ -3,6 +3,7 @@ namespace Flx.Compiler.Metadata;
 internal sealed class ModuleMetadata
 {
     public string Source { get; set; } = "";
+    public string? Package { get; set; }
     public string Module { get; set; } = "";
     public string CFile { get; set; } = "";
     public List<FunctionMetadata> Functions { get; set; } = [];

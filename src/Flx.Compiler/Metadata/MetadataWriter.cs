@@ -21,6 +21,7 @@ internal static class MetadataWriter
         var metadata = new ModuleMetadata
         {
             Source = module.SourceFile.DisplayPath,
+            Package = module.SourceFile.PackageName,
             Module = module.Name,
             CFile = Path.GetFileName(cFilePath),
             Functions = module.Functions.Select(function => new FunctionMetadata

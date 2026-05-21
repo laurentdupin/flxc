@@ -3,6 +3,7 @@ namespace Flx.Compiler.Cli;
 internal sealed class CommandLineOptions
 {
     public List<string> InputFiles { get; } = [];
+    public string? PackagePath { get; set; }
     public string? OutputPath { get; set; }
     public bool CompileOnly { get; set; }
     public bool EmitC { get; set; }
@@ -38,6 +39,7 @@ internal sealed class CommandLineOptions
 
         Options:
           -o <path>           Output executable or object path
+          --package <path>    Build from flx.package.json source package
           -c                  Compile object only; do not generate main or link
           --emit-c            Generate C and metadata, then stop
           --emit-pp           Generate preprocessed FLX, then stop

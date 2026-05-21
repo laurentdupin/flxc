@@ -1,0 +1,16 @@
+{
+  "name": "CycleB",
+  "type": "library",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [
+    {
+      "name": "CycleA",
+      "path": "../CycleA/flx.package.json"
+    }
+  ],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

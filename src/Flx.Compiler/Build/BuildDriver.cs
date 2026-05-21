@@ -3,6 +3,7 @@ using Flx.Compiler.Codegen.C;
 using Flx.Compiler.Diagnostics;
 using Flx.Compiler.Frontend;
 using Flx.Compiler.Metadata;
+using Flx.Compiler.Packages;
 using Flx.Compiler.Preprocessing;
 using Flx.Compiler.Semantics;
 
@@ -13,7 +14,14 @@ internal sealed class BuildDriver
     public async Task<int> RunAsync(CommandLineOptions options, TextWriter output, TextWriter error)
     {
         var diagnostics = new DiagnosticBag();
-        var sourceFiles = LoadSources(options, diagnostics);
+        var packageGraph = LoadPackageGraph(options, diagnostics);
+        if (packageGraph is not null)
+            ApplyPackageBuildOptions(options, packageGraph);
+
+        var sourceFiles = packageGraph is null
+            ? LoadSources(options, diagnostics)
+            : LoadPackageSources(packageGraph, diagnostics);
+
         if (diagnostics.HasErrors)
         {
             diagnostics.PrintTo(error);
@@ -60,8 +68,18 @@ internal sealed class BuildDriver
             return 0;
 
         var units = ParseSources(sourceFiles, diagnostics);
-        var requireSchedule = !options.CompileOnly && !options.NoMain;
+        var requireSchedule = !options.CompileOnly &&
+                              !options.NoMain &&
+                              packageGraph?.RootPackage.IsLibrary != true;
         var validateScheduleTargets = !options.CompileOnly;
+        ValidatePackageSchedules(packageGraph, units, requireSchedule, diagnostics);
+
+        if (diagnostics.HasErrors)
+        {
+            diagnostics.PrintTo(error);
+            return 1;
+        }
+
         var model = new SemanticAnalyzer(diagnostics).Analyze(units, requireSchedule, validateScheduleTargets);
 
         if (diagnostics.HasErrors)
@@ -112,6 +130,102 @@ internal sealed class BuildDriver
         }
 
         return sources;
+    }
+
+    private static PackageGraph? LoadPackageGraph(CommandLineOptions options, DiagnosticBag diagnostics)
+    {
+        if (string.IsNullOrWhiteSpace(options.PackagePath))
+            return null;
+
+        var packageGraph = new PackageLoader().Load(options.PackagePath, diagnostics);
+        if (packageGraph?.RootPackage.IsLibrary == true &&
+            !options.EmitC &&
+            !options.EmitPreprocessed &&
+            !options.CompileOnly)
+        {
+            diagnostics.Report("FLX0507", $"library package '{packageGraph.RootPackage.Name}' cannot be built as an executable.");
+        }
+
+        return packageGraph;
+    }
+
+    private static List<SourceFile> LoadPackageSources(PackageGraph packageGraph, DiagnosticBag diagnostics)
+    {
+        var sources = new List<SourceFile>();
+        foreach (var package in packageGraph.SourceOrder)
+        {
+            foreach (var sourcePath in package.SourcePaths)
+            {
+                if (!File.Exists(sourcePath))
+                {
+                    diagnostics.Report("FLX9005", $"input file '{sourcePath}' does not exist.");
+                    continue;
+                }
+
+                sources.Add(new SourceFile(
+                    sourcePath,
+                    File.ReadAllText(sourcePath),
+                    packageName: package.Name,
+                    packageRoot: package.RootDirectory));
+            }
+        }
+
+        return sources;
+    }
+
+    private static void ApplyPackageBuildOptions(CommandLineOptions options, PackageGraph packageGraph)
+    {
+        foreach (var package in packageGraph.Packages)
+        {
+            AddDistinct(options.IncludeDirs, package.CIncludeDirs, StringComparer.OrdinalIgnoreCase);
+            AddDistinct(options.Libraries, package.CLibraries, StringComparer.Ordinal);
+            AddDistinct(options.Defines, package.Defines, StringComparer.Ordinal);
+        }
+    }
+
+    private static void ValidatePackageSchedules(
+        PackageGraph? packageGraph,
+        IReadOnlyList<CompilationUnitSyntax> units,
+        bool requireSchedule,
+        DiagnosticBag diagnostics)
+    {
+        if (packageGraph is null)
+            return;
+
+        var packagesByName = packageGraph.Packages.ToDictionary(package => package.Name, StringComparer.Ordinal);
+        var scheduleCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var unit in units)
+        {
+            if (unit.Schedules.Count == 0)
+                continue;
+
+            var packageName = unit.Source.PackageName;
+            if (packageName is null || !packagesByName.TryGetValue(packageName, out var package))
+                continue;
+
+            scheduleCounts[packageName] = scheduleCounts.GetValueOrDefault(packageName) + unit.Schedules.Count;
+
+            if (!ReferenceEquals(package, packageGraph.RootPackage))
+            {
+                foreach (var schedule in unit.Schedules)
+                    diagnostics.Report("FLX0505", $"schedule block found in dependency package '{package.Name}'.", schedule.Location);
+                continue;
+            }
+
+            if (package.IsLibrary)
+            {
+                foreach (var schedule in unit.Schedules)
+                    diagnostics.Report("FLX0503", $"library package '{package.Name}' cannot contain a schedule block.", schedule.Location);
+            }
+        }
+
+        if (packageGraph.RootPackage.IsExecutable && requireSchedule)
+        {
+            var rootScheduleCount = scheduleCounts.GetValueOrDefault(packageGraph.RootPackage.Name);
+            if (rootScheduleCount != 1)
+                diagnostics.Report("FLX0504", $"executable package '{packageGraph.RootPackage.Name}' must contain exactly one schedule block.");
+        }
     }
 
     private static List<CompilationUnitSyntax> ParseSources(IEnumerable<SourceFile> sourceFiles, DiagnosticBag diagnostics)
@@ -166,9 +280,11 @@ internal sealed class BuildDriver
         var moduleHeaders = new List<ModuleHeader>();
         foreach (var module in model.Modules)
         {
-            var headerFileName = UniqueFileName(Path.GetFileName(module.SourceFile.DisplayPath) + ".g.h", usedNames);
+            var headerFileName = GeneratedRelativePath(module.SourceFile, ".g.h", usedNames);
             var headerPath = Path.Combine(outputDirectory, headerFileName);
-            await File.WriteAllTextAsync(headerPath, headerGenerator.Generate(module, model, headerFileName));
+            Directory.CreateDirectory(Path.GetDirectoryName(headerPath)!);
+            var runtimeHeaderIncludePath = RelativeIncludePath(outputDirectory, headerFileName, "flx_runtime.g.h");
+            await File.WriteAllTextAsync(headerPath, headerGenerator.Generate(module, model, headerFileName, runtimeHeaderIncludePath));
             moduleHeaders.Add(new ModuleHeader(module, headerFileName));
         }
 
@@ -179,12 +295,14 @@ internal sealed class BuildDriver
         foreach (var moduleHeader in moduleHeaders)
         {
             var module = moduleHeader.Module;
-            var cFileName = UniqueFileName(Path.GetFileName(module.SourceFile.DisplayPath) + ".g.c", usedNames);
+            var cFileName = GeneratedRelativePath(module.SourceFile, ".g.c", usedNames);
             var cPath = Path.Combine(outputDirectory, cFileName);
-            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model, options.AbsoluteLineDirectives, umbrellaHeaderFileName));
+            Directory.CreateDirectory(Path.GetDirectoryName(cPath)!);
+            var umbrellaIncludePath = RelativeIncludePath(outputDirectory, cFileName, umbrellaHeaderFileName);
+            await File.WriteAllTextAsync(cPath, cGenerator.Generate(module, model, options.AbsoluteLineDirectives, umbrellaIncludePath));
             generatedSources.Add(cPath);
 
-            var metadataPath = Path.Combine(outputDirectory, Path.GetFileName(module.SourceFile.DisplayPath) + ".meta.json");
+            var metadataPath = Path.Combine(outputDirectory, GeneratedRelativePath(module.SourceFile, ".meta.json", usedNames));
             await MetadataWriter.WriteAsync(module, cPath, metadataPath);
         }
 
@@ -299,6 +417,42 @@ internal sealed class BuildDriver
             if (usedNames.Add(candidate))
                 return candidate;
             index++;
+        }
+    }
+
+    private static string GeneratedRelativePath(SourceFile sourceFile, string suffix, HashSet<string> usedNames)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceFile.PackageName) &&
+            !string.IsNullOrWhiteSpace(sourceFile.PackageRoot))
+        {
+            var packageDirectory = CTypeNames.SafeIdentifier(sourceFile.PackageName);
+            var relativeSource = Path.GetRelativePath(sourceFile.PackageRoot, sourceFile.FullPath);
+            return Path.Combine(packageDirectory, relativeSource + suffix);
+        }
+
+        return UniqueFileName(Path.GetFileName(sourceFile.DisplayPath) + suffix, usedNames);
+    }
+
+    private static string RelativeIncludePath(string outputDirectory, string includingRelativeFile, string targetRelativeFile)
+    {
+        var includingDirectory = Path.GetDirectoryName(includingRelativeFile);
+        var fromDirectory = string.IsNullOrWhiteSpace(includingDirectory)
+            ? outputDirectory
+            : Path.Combine(outputDirectory, includingDirectory);
+        var targetPath = Path.Combine(outputDirectory, targetRelativeFile);
+
+        return Path.GetRelativePath(fromDirectory, targetPath)
+            .Replace(Path.DirectorySeparatorChar, '/')
+            .Replace(Path.AltDirectorySeparatorChar, '/');
+    }
+
+    private static void AddDistinct<T>(List<T> target, IEnumerable<T> values, IEqualityComparer<T> comparer)
+    {
+        var seen = new HashSet<T>(target, comparer);
+        foreach (var value in values)
+        {
+            if (seen.Add(value))
+                target.Add(value);
         }
     }
 

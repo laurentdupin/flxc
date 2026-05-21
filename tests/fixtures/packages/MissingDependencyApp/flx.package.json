@@ -1,0 +1,16 @@
+{
+  "name": "MissingDependencyApp",
+  "type": "exe",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [
+    {
+      "name": "MissingLib",
+      "path": "../MissingLib/flx.package.json"
+    }
+  ],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

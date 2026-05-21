@@ -208,6 +208,11 @@ PublishScripts/
 **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
+# FLX package-system sources and fixtures are intentional repository content.
+!src/Flx.Compiler/Packages/
+!src/Flx.Compiler/Packages/**
+!tests/fixtures/packages/
+!tests/fixtures/packages/**
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files

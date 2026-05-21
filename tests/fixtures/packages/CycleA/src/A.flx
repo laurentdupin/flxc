@@ -1,0 +1,4 @@
+module cycle.a;
+
+void A() {
+}

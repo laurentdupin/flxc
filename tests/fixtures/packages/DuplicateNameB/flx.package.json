@@ -1,0 +1,11 @@
+{
+  "name": "DuplicateName",
+  "type": "library",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

@@ -1,0 +1,16 @@
+{
+  "name": "ZombieApp",
+  "type": "exe",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [
+    {
+      "name": "ZombieLib",
+      "path": "../ZombieLib/flx.package.json"
+    }
+  ],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

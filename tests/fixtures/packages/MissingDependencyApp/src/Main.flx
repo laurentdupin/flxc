@@ -1,0 +1,8 @@
+module missingapp;
+
+void Main() {
+}
+
+schedule {
+    run Main;
+}

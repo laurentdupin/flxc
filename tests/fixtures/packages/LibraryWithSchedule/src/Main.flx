@@ -1,0 +1,8 @@
+module badlib;
+
+void Something() {
+}
+
+schedule {
+    run Something;
+}

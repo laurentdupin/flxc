@@ -1,0 +1,20 @@
+{
+  "name": "DuplicateNameApp",
+  "type": "exe",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [
+    {
+      "name": "DuplicateNameA",
+      "path": "../DuplicateNameA/flx.package.json"
+    },
+    {
+      "name": "DuplicateNameB",
+      "path": "../DuplicateNameB/flx.package.json"
+    }
+  ],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

@@ -1,0 +1,4 @@
+module duplicate.b;
+
+void B() {
+}

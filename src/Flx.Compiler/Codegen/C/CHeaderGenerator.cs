@@ -5,7 +5,7 @@ namespace Flx.Compiler.Codegen.C;
 
 internal sealed class CHeaderGenerator
 {
-    public string Generate(ModuleSymbol module, CompilationModel model, string headerFileName)
+    public string Generate(ModuleSymbol module, CompilationModel model, string headerFileName, string runtimeHeaderIncludePath)
     {
         var builder = new StringBuilder();
         var guard = IncludeGuard(headerFileName);
@@ -26,7 +26,7 @@ internal sealed class CHeaderGenerator
 
         if (model.RequiresRuntime)
         {
-            builder.AppendLine("#include \"flx_runtime.g.h\"");
+            builder.AppendLine($"#include \"{runtimeHeaderIncludePath}\"");
             builder.AppendLine();
         }
         else if (ModuleUsesSizeT(module))

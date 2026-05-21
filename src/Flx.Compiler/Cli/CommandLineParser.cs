@@ -109,6 +109,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (TryReadLongOptionValue(args, ref i, arg, "--package", diagnostics, out var packagePath))
+            {
+                options.PackagePath = packagePath;
+                continue;
+            }
+
             if (TryReadLongOptionValue(args, ref i, arg, "--generated-list", diagnostics, out var generatedList))
             {
                 options.GeneratedListPath = generatedList;
@@ -190,8 +196,11 @@ internal static class CommandLineParser
             options.InputFiles.Add(arg);
         }
 
-        if (!options.ShowHelp && !options.ShowVersion && options.InputFiles.Count == 0)
+        if (!options.ShowHelp && !options.ShowVersion && options.InputFiles.Count == 0 && string.IsNullOrWhiteSpace(options.PackagePath))
             diagnostics.Report("FLX9002", "no input files specified.");
+
+        if (!string.IsNullOrWhiteSpace(options.PackagePath) && options.InputFiles.Count > 0)
+            diagnostics.Report("FLX9007", "--package cannot be combined with positional .flx input files.");
 
         if (options.CompileOnly && options.InputFiles.Count > 1 && options.OutputPath is not null)
             diagnostics.Report("FLX9003", "-c with multiple input files cannot use a single -o output path.");

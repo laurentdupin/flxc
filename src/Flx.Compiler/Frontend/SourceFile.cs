@@ -6,12 +6,19 @@ internal sealed class SourceFile
 {
     private readonly int[] _lineStarts;
 
-    public SourceFile(string path, string text, string? originalText = null)
+    public SourceFile(
+        string path,
+        string text,
+        string? originalText = null,
+        string? packageName = null,
+        string? packageRoot = null)
     {
         FullPath = Path.GetFullPath(path);
         DisplayPath = MakeDisplayPath(path);
         Text = text;
         OriginalText = originalText ?? text;
+        PackageName = packageName;
+        PackageRoot = packageRoot is null ? null : Path.GetFullPath(packageRoot);
         _lineStarts = ComputeLineStarts(text);
     }
 
@@ -19,6 +26,8 @@ internal sealed class SourceFile
     public string DisplayPath { get; }
     public string Text { get; }
     public string OriginalText { get; }
+    public string? PackageName { get; }
+    public string? PackageRoot { get; }
 
     public SourceLocation GetLocation(int position)
     {

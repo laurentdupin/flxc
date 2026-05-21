@@ -1,0 +1,8 @@
+module duplicatenameapp;
+
+void Main() {
+}
+
+schedule {
+    run Main;
+}

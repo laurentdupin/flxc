@@ -30,7 +30,12 @@ internal sealed class ExternalCPreprocessor : IPreprocessor
         var text = await File.ReadAllTextAsync(outputPath, cancellationToken);
         return new PreprocessedSource
         {
-            SourceFile = new SourceFile(source.FullPath, text, source.OriginalText),
+            SourceFile = new SourceFile(
+                source.FullPath,
+                text,
+                source.OriginalText,
+                source.PackageName,
+                source.PackageRoot),
             Text = text,
             TemporaryPath = outputPath
         };
