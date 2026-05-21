@@ -11,6 +11,9 @@ internal sealed class PackageManifest
     [JsonPropertyName("type")]
     public string Type { get; set; } = "exe";
 
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = "";
+
     [JsonPropertyName("sources")]
     public List<string> Sources { get; set; } = [];
 
@@ -43,6 +46,9 @@ internal sealed class PackageDependencyManifest
 
     [JsonPropertyName("libraries")]
     public List<string> Libraries { get; set; } = [];
+
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = "";
 }
 
 internal sealed class PackageGraph
@@ -68,12 +74,14 @@ internal sealed class LoadedBinaryPackage
 {
     public LoadedBinaryPackage(
         string name,
+        string version,
         string metadataPath,
         IReadOnlyList<string> includeDirs,
         IReadOnlyList<string> libraries,
         PackageMetadata metadata)
     {
         Name = name;
+        Version = version;
         MetadataPath = metadataPath;
         IncludeDirs = includeDirs;
         Libraries = libraries;
@@ -81,6 +89,7 @@ internal sealed class LoadedBinaryPackage
     }
 
     public string Name { get; }
+    public string Version { get; }
     public string MetadataPath { get; }
     public IReadOnlyList<string> IncludeDirs { get; }
     public IReadOnlyList<string> Libraries { get; }
@@ -91,6 +100,7 @@ internal sealed class LoadedPackage
 {
     public LoadedPackage(
         string name,
+        string version,
         string type,
         string manifestPath,
         string rootDirectory,
@@ -100,6 +110,7 @@ internal sealed class LoadedPackage
         IReadOnlyList<string> defines)
     {
         Name = name;
+        Version = version;
         Type = type;
         ManifestPath = manifestPath;
         RootDirectory = rootDirectory;
@@ -110,6 +121,7 @@ internal sealed class LoadedPackage
     }
 
     public string Name { get; }
+    public string Version { get; }
     public string Type { get; }
     public string ManifestPath { get; }
     public string RootDirectory { get; }

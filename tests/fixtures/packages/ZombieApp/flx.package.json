@@ -1,5 +1,6 @@
 {
   "name": "ZombieApp",
+  "version": "0.1.0",
   "type": "exe",
   "sources": [
     "src/**/*.flx"
@@ -7,6 +8,7 @@
   "dependencies": [
     {
       "name": "ZombieLib",
+      "version": "0.1.0",
       "path": "../ZombieLib/flx.package.json"
     }
   ],

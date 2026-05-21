@@ -52,6 +52,9 @@ internal sealed class Parser
                 case TokenKind.PrefabKeyword:
                     unit.Prefabs.Add(ParsePrefab());
                     break;
+                case TokenKind.ExportKeyword:
+                    ParseExportedDeclaration(unit);
+                    break;
                 case TokenKind.VoidKeyword:
                 case TokenKind.Identifier:
                     ParseFunctionOrGlobal(unit);
@@ -88,23 +91,45 @@ internal sealed class Parser
         return new CImportSyntax(header.Value ?? "", alias.Text, importToken.Location);
     }
 
-    private ComponentDeclSyntax ParseComponent()
+    private void ParseExportedDeclaration(CompilationUnitSyntax unit)
+    {
+        var exportToken = Expect(TokenKind.ExportKeyword, "expected 'export'.");
+        switch (Current.Kind)
+        {
+            case TokenKind.ComponentKeyword:
+                unit.Components.Add(ParseComponent(isExported: true));
+                break;
+            case TokenKind.PrefabKeyword:
+                unit.Prefabs.Add(ParsePrefab(isExported: true));
+                break;
+            case TokenKind.VoidKeyword:
+            case TokenKind.Identifier:
+                ParseFunctionOrGlobal(unit, isExported: true);
+                break;
+            default:
+                _diagnostics.Report("FLX0600", "expected exported component, prefab, or function declaration.", exportToken.Location);
+                Advance();
+                break;
+        }
+    }
+
+    private ComponentDeclSyntax ParseComponent(bool isExported = false)
     {
         var componentToken = Expect(TokenKind.ComponentKeyword, "expected 'component'.");
         var name = ExpectIdentifier("expected component name.");
         var (bodyText, bodyStart) = ParseRawBlock("expected component body.", "unterminated component body.");
-        return new ComponentDeclSyntax(name.Text, bodyText, bodyStart, componentToken.Location, name.Location);
+        return new ComponentDeclSyntax(name.Text, bodyText, bodyStart, componentToken.Location, name.Location, isExported);
     }
 
-    private PrefabDeclSyntax ParsePrefab()
+    private PrefabDeclSyntax ParsePrefab(bool isExported = false)
     {
         var prefabToken = Expect(TokenKind.PrefabKeyword, "expected 'prefab'.");
         var name = ExpectIdentifier("expected prefab name.");
         var (bodyText, bodyStart) = ParseRawBlock("expected prefab body.", "unterminated prefab body.");
-        return new PrefabDeclSyntax(name.Text, bodyText, bodyStart, prefabToken.Location, name.Location);
+        return new PrefabDeclSyntax(name.Text, bodyText, bodyStart, prefabToken.Location, name.Location, isExported);
     }
 
-    private void ParseFunctionOrGlobal(CompilationUnitSyntax unit)
+    private void ParseFunctionOrGlobal(CompilationUnitSyntax unit, bool isExported = false)
     {
         var returnType = ParseTypeName("expected function return type.");
         var declarationLocation = Previous.Location;
@@ -116,13 +141,13 @@ internal sealed class Parser
             var parameters = ParseParameterList();
             Expect(TokenKind.RightParen, "expected ')' after function parameters.");
             var (bodyText, bodyStart) = ParseRawBlock("expected function body.", "unterminated function body.");
-            unit.Functions.Add(new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location));
+            unit.Functions.Add(new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location, isExported));
             return;
         }
 
         var initializer = ParseOptionalGlobalInitializer();
         Expect(TokenKind.Semicolon, "expected ';' after global variable declaration.");
-        unit.Globals.Add(new GlobalVariableDeclSyntax(returnType, name.Text, initializer, declarationLocation, name.Location));
+        unit.Globals.Add(new GlobalVariableDeclSyntax(returnType, name.Text, initializer, declarationLocation, name.Location, isExported));
     }
 
     private string? ParseOptionalGlobalInitializer()

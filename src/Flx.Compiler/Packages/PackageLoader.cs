@@ -88,7 +88,15 @@ internal sealed class PackageLoader
                 var dependencyPath = Path.GetFullPath(Path.Combine(rootDirectory, dependency.Path));
                 var loadedDependency = LoadRecursive(dependencyPath, diagnostics);
                 if (loadedDependency is not null)
+                {
+                    if (!string.IsNullOrWhiteSpace(dependency.Version) &&
+                        !string.Equals(dependency.Version, loadedDependency.Version, StringComparison.Ordinal))
+                    {
+                        diagnostics.Report("FLX0614", $"package '{loadedDependency.Name}' version '{loadedDependency.Version}' does not match requested version '{dependency.Version}'.");
+                    }
+
                     dependencies.Add(loadedDependency);
+                }
                 continue;
             }
 
@@ -105,6 +113,7 @@ internal sealed class PackageLoader
 
         var package = new LoadedPackage(
             manifest.Name,
+            manifest.Version,
             manifest.Type,
             manifestPath,
             rootDirectory,
@@ -155,7 +164,18 @@ internal sealed class PackageLoader
         var declaredName = string.IsNullOrWhiteSpace(dependency.Name) ? metadata.Name : dependency.Name;
         if (!string.Equals(declaredName, metadata.Name, StringComparison.Ordinal))
         {
-            diagnostics.Report("FLX0508", $"binary package dependency '{declaredName}' references metadata for package '{metadata.Name}'.");
+            diagnostics.Report("FLX0611", $"binary package dependency '{declaredName}' references metadata for package '{metadata.Name}'.");
+        }
+
+        if (!string.Equals(metadata.RuntimeAbi, PackageMetadata.CurrentRuntimeAbi, StringComparison.Ordinal))
+        {
+            diagnostics.Report("FLX0610", $"binary package '{metadata.Name}' was built with incompatible FLX runtime ABI '{metadata.RuntimeAbi}'. Expected '{PackageMetadata.CurrentRuntimeAbi}'.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(dependency.Version) &&
+            !string.Equals(dependency.Version, metadata.Version, StringComparison.Ordinal))
+        {
+            diagnostics.Report("FLX0614", $"binary package '{metadata.Name}' version '{metadata.Version}' does not match requested version '{dependency.Version}'.");
         }
 
         var includeDirs = dependency.IncludeDirs
@@ -172,7 +192,19 @@ internal sealed class PackageLoader
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var binaryPackage = new LoadedBinaryPackage(metadata.Name, metadataPath, includeDirs, libraries, metadata);
+        foreach (var header in metadata.Headers.Where(header => !string.IsNullOrWhiteSpace(header)))
+        {
+            if (!HeaderExists(header, includeDirs))
+                diagnostics.Report("FLX0612", $"binary package '{metadata.Name}' references missing public header '{header}'.");
+        }
+
+        foreach (var library in libraries)
+        {
+            if (!File.Exists(library))
+                diagnostics.Report("FLX0613", $"binary package '{metadata.Name}' references missing library '{library}'.");
+        }
+
+        var binaryPackage = new LoadedBinaryPackage(metadata.Name, metadata.Version, metadataPath, includeDirs, libraries, metadata);
 
         if (_packagesByName.ContainsKey(binaryPackage.Name) ||
             (_binaryPackagesByName.TryGetValue(binaryPackage.Name, out var existingName) &&
@@ -200,6 +232,14 @@ internal sealed class PackageLoader
             diagnostics.Report("FLX0500", $"failed to read package manifest '{manifestPath}': {ex.Message}");
             return null;
         }
+    }
+
+    private static bool HeaderExists(string header, IReadOnlyList<string> includeDirs)
+    {
+        if (Path.IsPathRooted(header) && File.Exists(header))
+            return true;
+
+        return includeDirs.Any(includeDir => File.Exists(Path.Combine(includeDir, header)));
     }
 
     private static void ValidateManifest(PackageManifest manifest, string manifestPath, DiagnosticBag diagnostics)

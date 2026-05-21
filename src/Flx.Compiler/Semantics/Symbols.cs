@@ -50,13 +50,20 @@ internal sealed class ComponentFieldSymbol
 
 internal sealed class ComponentSymbol
 {
-    public ComponentSymbol(SourceFile sourceFile, ComponentDeclSyntax syntax, string name, string fullName, IReadOnlyList<ComponentFieldSymbol> fields)
+    public ComponentSymbol(
+        SourceFile sourceFile,
+        ComponentDeclSyntax syntax,
+        string name,
+        string fullName,
+        IReadOnlyList<ComponentFieldSymbol> fields,
+        bool isExported = false)
     {
         SourceFile = sourceFile;
         Syntax = syntax;
         Name = name;
         FullName = fullName;
         Fields = fields;
+        IsExported = isExported;
     }
 
     public SourceFile SourceFile { get; }
@@ -64,6 +71,7 @@ internal sealed class ComponentSymbol
     public string Name { get; }
     public string FullName { get; }
     public IReadOnlyList<ComponentFieldSymbol> Fields { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class PrefabFieldSymbol
@@ -80,13 +88,20 @@ internal sealed class PrefabFieldSymbol
 
 internal sealed class PrefabSymbol
 {
-    public PrefabSymbol(SourceFile sourceFile, PrefabDeclSyntax syntax, string name, string fullName, IReadOnlyList<ComponentSymbol> flattenedComponents)
+    public PrefabSymbol(
+        SourceFile sourceFile,
+        PrefabDeclSyntax syntax,
+        string name,
+        string fullName,
+        IReadOnlyList<ComponentSymbol> flattenedComponents,
+        bool isExported = false)
     {
         SourceFile = sourceFile;
         Syntax = syntax;
         Name = name;
         FullName = fullName;
         FlattenedComponents = flattenedComponents;
+        IsExported = isExported;
     }
 
     public SourceFile SourceFile { get; }
@@ -94,6 +109,7 @@ internal sealed class PrefabSymbol
     public string Name { get; }
     public string FullName { get; }
     public IReadOnlyList<ComponentSymbol> FlattenedComponents { get; }
+    public bool IsExported { get; }
 
     public IEnumerable<PrefabFieldSymbol> Fields =>
         FlattenedComponents.SelectMany(component => component.Fields.Select(componentField => new PrefabFieldSymbol(component, componentField)));
@@ -111,7 +127,8 @@ internal sealed class FunctionSymbol
         string returnType,
         IReadOnlyList<ParameterSymbol> parameters,
         SourceLocation location,
-        bool isExternal = false)
+        bool isExternal = false,
+        bool isExported = false)
     {
         Module = module;
         SourceFile = sourceFile;
@@ -123,6 +140,7 @@ internal sealed class FunctionSymbol
         Parameters = parameters;
         Location = location;
         IsExternal = isExternal;
+        IsExported = isExported;
     }
 
     public ModuleSymbol Module { get; }
@@ -136,6 +154,7 @@ internal sealed class FunctionSymbol
     public SourceLocation Location { get; }
     public string? ReceiverType { get; set; }
     public bool IsExternal { get; }
+    public bool IsExported { get; }
     public bool NeedsWorld => !IsExternal && Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
 }
 
@@ -149,7 +168,8 @@ internal sealed class GlobalVariableSymbol
         string name,
         string fullName,
         string? initializer,
-        SourceLocation location)
+        SourceLocation location,
+        bool isExported = false)
     {
         Module = module;
         SourceFile = sourceFile;
@@ -159,6 +179,7 @@ internal sealed class GlobalVariableSymbol
         FullName = fullName;
         Initializer = initializer;
         Location = location;
+        IsExported = isExported;
     }
 
     public ModuleSymbol Module { get; }
@@ -169,6 +190,7 @@ internal sealed class GlobalVariableSymbol
     public string FullName { get; }
     public string? Initializer { get; }
     public SourceLocation Location { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class ModuleSymbol
@@ -203,6 +225,7 @@ internal sealed class CompilationModel
     public Dictionary<string, List<ComponentSymbol>> ComponentsByShortName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, PrefabSymbol> PrefabsByFullName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, List<PrefabSymbol>> PrefabsByShortName { get; } = new(StringComparer.Ordinal);
+    public HashSet<string> HiddenExternalSymbols { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
     public List<string> ExternalHeaders { get; } = [];
     public ScheduleDeclSyntax? Schedule => Schedules.Count == 1 ? Schedules[0] : null;

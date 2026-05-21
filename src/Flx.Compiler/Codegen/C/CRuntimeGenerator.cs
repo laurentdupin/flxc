@@ -5,9 +5,21 @@ namespace Flx.Compiler.Codegen.C;
 
 internal sealed class CRuntimeGenerator
 {
-    public string GenerateHeader(CompilationModel model)
+    public string GenerateHeader(
+        CompilationModel model,
+        Func<ComponentSymbol, bool>? includeComponent = null,
+        Func<PrefabSymbol, bool>? includePrefab = null)
     {
         var builder = new StringBuilder();
+        var components = model.ComponentsByFullName.Values
+            .Where(includeComponent ?? (_ => true))
+            .OrderBy(component => component.FullName, StringComparer.Ordinal)
+            .ToArray();
+        var prefabs = model.PrefabsByFullName.Values
+            .Where(includePrefab ?? (_ => true))
+            .OrderBy(prefab => prefab.FullName, StringComparer.Ordinal)
+            .ToArray();
+
         builder.AppendLine("#ifndef FLX_RUNTIME_G_H");
         builder.AppendLine("#define FLX_RUNTIME_G_H");
         builder.AppendLine();
@@ -49,7 +61,7 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine("void flx_array_string_destroy_borrowed(flx_array_string *a);");
         builder.AppendLine();
 
-        foreach (var component in model.ComponentsByFullName.Values.OrderBy(component => component.FullName, StringComparer.Ordinal))
+        foreach (var component in components)
         {
             builder.AppendLine($"typedef struct {CTypeNames.ComponentType(component.FullName)} {{");
             foreach (var field in component.Fields)
@@ -58,7 +70,7 @@ internal sealed class CRuntimeGenerator
             builder.AppendLine();
         }
 
-        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
+        foreach (var prefab in prefabs)
         {
             builder.AppendLine($"typedef struct {CTypeNames.PrefabType(prefab.FullName)} {{");
             builder.AppendLine("    usize id;");
@@ -73,7 +85,6 @@ internal sealed class CRuntimeGenerator
         }
 
         builder.AppendLine("typedef struct flx_world {");
-        var prefabs = model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal).ToArray();
         if (prefabs.Length == 0)
             builder.AppendLine("    int _unused;");
         foreach (var prefab in prefabs)
@@ -87,7 +98,7 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine("void flx_world_init(flx_world *world);");
         builder.AppendLine("void flx_world_destroy(flx_world *world);");
 
-        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
+        foreach (var prefab in prefabs)
         {
             builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.CreateFunction(prefab.FullName)}(flx_world *world);");
             builder.AppendLine($"{CTypeNames.ViewType(prefab.FullName)} {CTypeNames.GetFunction(prefab.FullName)}(flx_world *world, usize index);");

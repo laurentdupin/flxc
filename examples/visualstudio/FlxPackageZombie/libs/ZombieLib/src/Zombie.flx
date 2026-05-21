@@ -1,9 +1,9 @@
 module zombies;
 
-component ZombieData {
+export component ZombieData {
     string name = "";
 }
 
-prefab Zombie {
+export prefab Zombie {
     flatten ZombieData;
 }

@@ -54,7 +54,8 @@ internal sealed class FunctionDeclSyntax
         string bodyText,
         int bodyStart,
         SourceLocation declarationLocation,
-        SourceLocation nameLocation)
+        SourceLocation nameLocation,
+        bool isExported = false)
     {
         ReturnType = returnType;
         Name = name;
@@ -63,6 +64,7 @@ internal sealed class FunctionDeclSyntax
         BodyStart = bodyStart;
         DeclarationLocation = declarationLocation;
         NameLocation = nameLocation;
+        IsExported = isExported;
     }
 
     public string ReturnType { get; }
@@ -72,6 +74,7 @@ internal sealed class FunctionDeclSyntax
     public int BodyStart { get; }
     public SourceLocation DeclarationLocation { get; }
     public SourceLocation NameLocation { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class GlobalVariableDeclSyntax
@@ -81,13 +84,15 @@ internal sealed class GlobalVariableDeclSyntax
         string name,
         string? initializer,
         SourceLocation declarationLocation,
-        SourceLocation nameLocation)
+        SourceLocation nameLocation,
+        bool isExported = false)
     {
         Type = type;
         Name = name;
         Initializer = initializer;
         DeclarationLocation = declarationLocation;
         NameLocation = nameLocation;
+        IsExported = isExported;
     }
 
     public string Type { get; }
@@ -95,17 +100,25 @@ internal sealed class GlobalVariableDeclSyntax
     public string? Initializer { get; }
     public SourceLocation DeclarationLocation { get; }
     public SourceLocation NameLocation { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class ComponentDeclSyntax
 {
-    public ComponentDeclSyntax(string name, string bodyText, int bodyStart, SourceLocation location, SourceLocation nameLocation)
+    public ComponentDeclSyntax(
+        string name,
+        string bodyText,
+        int bodyStart,
+        SourceLocation location,
+        SourceLocation nameLocation,
+        bool isExported = false)
     {
         Name = name;
         BodyText = bodyText;
         BodyStart = bodyStart;
         Location = location;
         NameLocation = nameLocation;
+        IsExported = isExported;
     }
 
     public string Name { get; }
@@ -113,17 +126,25 @@ internal sealed class ComponentDeclSyntax
     public int BodyStart { get; }
     public SourceLocation Location { get; }
     public SourceLocation NameLocation { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class PrefabDeclSyntax
 {
-    public PrefabDeclSyntax(string name, string bodyText, int bodyStart, SourceLocation location, SourceLocation nameLocation)
+    public PrefabDeclSyntax(
+        string name,
+        string bodyText,
+        int bodyStart,
+        SourceLocation location,
+        SourceLocation nameLocation,
+        bool isExported = false)
     {
         Name = name;
         BodyText = bodyText;
         BodyStart = bodyStart;
         Location = location;
         NameLocation = nameLocation;
+        IsExported = isExported;
     }
 
     public string Name { get; }
@@ -131,6 +152,7 @@ internal sealed class PrefabDeclSyntax
     public int BodyStart { get; }
     public SourceLocation Location { get; }
     public SourceLocation NameLocation { get; }
+    public bool IsExported { get; }
 }
 
 internal sealed class ParameterSyntax

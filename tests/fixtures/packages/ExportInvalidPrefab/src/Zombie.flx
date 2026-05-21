@@ -1,6 +1,6 @@
 module zombies;
 
-export component ZombieData {
+component ZombieData {
     string name = "";
 }
 

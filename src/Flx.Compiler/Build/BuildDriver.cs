@@ -83,6 +83,7 @@ internal sealed class BuildDriver
 
         var externalPackages = packageGraph?.BinaryPackages.Select(package => package.Metadata).ToArray() ?? [];
         var model = new SemanticAnalyzer(diagnostics).Analyze(units, requireSchedule, validateScheduleTargets, externalPackages);
+        ValidateLibraryExports(packageGraph, model, diagnostics);
 
         if (diagnostics.HasErrors)
         {
@@ -240,6 +241,91 @@ internal sealed class BuildDriver
         }
     }
 
+    private static void ValidateLibraryExports(
+        PackageGraph? packageGraph,
+        CompilationModel model,
+        DiagnosticBag diagnostics)
+    {
+        if (packageGraph?.RootPackage.IsLibrary != true)
+            return;
+
+        var package = packageGraph.RootPackage;
+
+        foreach (var global in model.GlobalsByFullName.Values.Where(global => IsOwnedByRootPackage(global.SourceFile, package) && global.IsExported))
+            diagnostics.Report("FLX0600", $"exported global variable '{global.FullName}' is not implemented yet.", global.Location);
+
+        foreach (var component in model.ComponentsByFullName.Values.Where(component => IsOwnedByRootPackage(component.SourceFile, package) && component.IsExported))
+        {
+            foreach (var field in component.Fields)
+            {
+                if (!IsExportableType(field.Type, model, out var hiddenType))
+                {
+                    diagnostics.Report(
+                        "FLX0604",
+                        $"exported component '{component.FullName}' uses non-exported field type '{hiddenType}'.",
+                        field.Location);
+                }
+            }
+        }
+
+        foreach (var prefab in model.PrefabsByFullName.Values.Where(prefab => IsOwnedByRootPackage(prefab.SourceFile, package) && prefab.IsExported))
+        {
+            foreach (var component in prefab.FlattenedComponents)
+            {
+                if (!component.IsExported)
+                {
+                    diagnostics.Report(
+                        "FLX0601",
+                        $"exported prefab '{prefab.FullName}' uses non-exported component '{component.FullName}'.",
+                        prefab.Syntax.Location);
+                }
+            }
+        }
+
+        foreach (var function in model.FunctionRegistry.AllFunctions.Where(function => IsOwnedByRootPackage(function.SourceFile, package) && function.IsExported))
+        {
+            if (!IsExportableType(function.ReturnType, model, out var hiddenReturnType))
+            {
+                diagnostics.Report(
+                    "FLX0602",
+                    $"exported function '{function.FullName}' uses non-exported return type '{hiddenReturnType}'.",
+                    function.Location);
+            }
+
+            foreach (var parameter in function.Parameters)
+            {
+                if (!IsExportableType(parameter.Type, model, out var hiddenParameterType))
+                {
+                    diagnostics.Report(
+                        "FLX0602",
+                        $"exported function '{function.FullName}' uses non-exported parameter type '{hiddenParameterType}'.",
+                        parameter.Location);
+                }
+            }
+        }
+    }
+
+    private static bool IsExportableType(string typeName, CompilationModel model, out string hiddenType)
+    {
+        hiddenType = typeName;
+
+        if (typeName is "void" or "i32" or "usize" or "string" or "Array<string>")
+            return true;
+
+        if (model.ComponentsByFullName.TryGetValue(typeName, out var component))
+            return component.IsExported;
+
+        if (model.PrefabsByFullName.TryGetValue(typeName, out var prefab))
+            return prefab.IsExported;
+
+        return true;
+    }
+
+    private static bool IsOwnedByRootPackage(SourceFile sourceFile, LoadedPackage package)
+    {
+        return string.Equals(sourceFile.PackageName, package.Name, StringComparison.Ordinal);
+    }
+
     private static List<CompilationUnitSyntax> ParseSources(IEnumerable<SourceFile> sourceFiles, DiagnosticBag diagnostics)
     {
         var units = new List<CompilationUnitSyntax>();
@@ -331,7 +417,7 @@ internal sealed class BuildDriver
             await WriteGeneratedListAsync(options.GeneratedListPath, generatedSources);
 
         if (options.BuildLibrary && packageGraph is not null)
-            await EmitLibraryPackageArtifactsAsync(packageGraph.RootPackage, model, moduleHeaders, outputDirectory, options);
+            await EmitLibraryPackageArtifactsAsync(packageGraph.RootPackage, model, outputDirectory, options);
 
         return new GenerationResult(outputDirectory, shouldDeleteDirectory, generatedSources, mainSource);
     }
@@ -339,7 +425,6 @@ internal sealed class BuildDriver
     private static async Task EmitLibraryPackageArtifactsAsync(
         LoadedPackage package,
         CompilationModel model,
-        IReadOnlyList<ModuleHeader> moduleHeaders,
         string outputDirectory,
         CommandLineOptions options)
     {
@@ -350,35 +435,43 @@ internal sealed class BuildDriver
 
         var runtimeHeaderPath = Path.Combine(outputDirectory, "flx_runtime.g.h");
         if (File.Exists(runtimeHeaderPath))
-            File.Copy(runtimeHeaderPath, Path.Combine(publicIncludeDir, "flx_runtime.g.h"), overwrite: true);
-
-        var rootModuleHeaders = moduleHeaders
-            .Where(header => string.Equals(header.Module.SourceFile.PackageName, package.Name, StringComparison.Ordinal))
-            .OrderBy(header => header.HeaderFileName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        foreach (var header in rootModuleHeaders)
         {
-            var source = Path.Combine(outputDirectory, header.HeaderFileName);
-            var destination = Path.Combine(publicIncludeDir, header.HeaderFileName);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(source, destination, overwrite: true);
+            var runtime = new CRuntimeGenerator();
+            await File.WriteAllTextAsync(
+                Path.Combine(publicIncludeDir, "flx_runtime.g.h"),
+                runtime.GenerateHeader(
+                    model,
+                    component => IsOwnedByRootPackage(component.SourceFile, package) && component.IsExported,
+                    prefab => IsOwnedByRootPackage(prefab.SourceFile, package) && prefab.IsExported));
         }
 
         var packageHeaderName = "flx_" + CTypeNames.SafeIdentifier(package.Name) + ".g.h";
         await File.WriteAllTextAsync(
             Path.Combine(publicIncludeDir, packageHeaderName),
-            GeneratePackageHeader(package, rootModuleHeaders, model.RequiresRuntime));
+            GeneratePackageHeader(package, model));
         publicHeaders.Add(packageHeaderName);
 
         var metadataPath = Path.GetFullPath(options.MetadataOutputPath ?? Path.Combine(outputDirectory, package.Name + ".flxmeta.json"));
         await PackageMetadataWriter.WriteAsync(package, model, publicHeaders, metadataPath);
     }
 
-    private static string GeneratePackageHeader(LoadedPackage package, IReadOnlyList<ModuleHeader> rootModuleHeaders, bool includeRuntime)
+    private static string GeneratePackageHeader(LoadedPackage package, CompilationModel model)
     {
         var builder = new System.Text.StringBuilder();
         var guard = "FLX_" + CTypeNames.SafeIdentifier(package.Name).ToUpperInvariant() + "_G_H";
+        var exportedFunctions = model.FunctionRegistry.AllFunctions
+            .Where(function => IsOwnedByRootPackage(function.SourceFile, package) && function.IsExported)
+            .OrderBy(function => function.FullName, StringComparer.Ordinal)
+            .ThenBy(function => function.MangledName, StringComparer.Ordinal)
+            .ToArray();
+        var cHeaders = exportedFunctions
+            .SelectMany(function => function.Module.CImports.Select(import => import.Header))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var usesSizeT = !model.RequiresRuntime && exportedFunctions.Any(function =>
+            function.ReturnType == "usize" ||
+            function.Parameters.Any(parameter => parameter.Type == "usize"));
 
         builder.AppendLine("/* Generated by flxc. Do not edit. */");
         builder.AppendLine($"/* Package: {package.Name} */");
@@ -386,16 +479,29 @@ internal sealed class BuildDriver
         builder.AppendLine($"#ifndef {guard}");
         builder.AppendLine($"#define {guard}");
         builder.AppendLine();
-        if (includeRuntime)
+        if (model.RequiresRuntime)
         {
             builder.AppendLine("#include \"flx_runtime.g.h\"");
             builder.AppendLine();
         }
+        else if (usesSizeT)
+        {
+            builder.AppendLine("#include <stddef.h>");
+            builder.AppendLine();
+        }
 
-        foreach (var header in rootModuleHeaders)
-            builder.AppendLine($"#include \"{header.HeaderFileName.Replace("\\", "/", StringComparison.Ordinal)}\"");
+        foreach (var header in cHeaders)
+            builder.AppendLine($"#include <{header}>");
 
-        builder.AppendLine();
+        if (cHeaders.Length > 0)
+            builder.AppendLine();
+
+        foreach (var function in exportedFunctions)
+            builder.AppendLine(CTypeNames.FormatExternPrototype(function, model));
+
+        if (exportedFunctions.Length > 0)
+            builder.AppendLine();
+
         builder.AppendLine($"#endif /* {guard} */");
         return builder.ToString();
     }

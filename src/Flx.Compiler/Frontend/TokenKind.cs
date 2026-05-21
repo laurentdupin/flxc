@@ -15,6 +15,7 @@ internal enum TokenKind
     ScheduleKeyword,
     RunKeyword,
     LoopToKeyword,
+    ExportKeyword,
     ComponentKeyword,
     PrefabKeyword,
     LeftParen,

@@ -37,6 +37,7 @@ internal sealed class SemanticAnalyzer
             model.Schedules.AddRange(unit.Schedules);
         }
 
+        BindHiddenExternalSymbols(model, externalPackages ?? []);
         BindExternalComponents(model, externalPackages ?? []);
 
         foreach (var module in model.Modules)
@@ -77,7 +78,7 @@ internal sealed class SemanticAnalyzer
             }
 
             var fields = ParseComponentFields(component, module.SourceFile);
-            var symbol = new ComponentSymbol(module.SourceFile, component, component.Name, fullName, fields);
+            var symbol = new ComponentSymbol(module.SourceFile, component, component.Name, fullName, fields, component.IsExported);
             module.Components.Add(symbol);
             model.ComponentsByFullName.Add(symbol.FullName, symbol);
             AddByShortName(model.ComponentsByShortName, symbol.Name, symbol);
@@ -103,13 +104,13 @@ internal sealed class SemanticAnalyzer
                 }
 
                 var sourceFile = ExternalSourceFile(package);
-                var syntax = new ComponentDeclSyntax(component.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package));
+                var syntax = new ComponentDeclSyntax(component.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package), isExported: true);
                 var fields = component.Fields.Select(field => new ComponentFieldSymbol(
                     field.Type,
                     field.Name,
                     field.DefaultValue,
                     ExternalLocation(package))).ToArray();
-                var symbol = new ComponentSymbol(sourceFile, syntax, component.Name, component.FullName, fields);
+                var symbol = new ComponentSymbol(sourceFile, syntax, component.Name, component.FullName, fields, isExported: true);
 
                 model.ComponentsByFullName.Add(symbol.FullName, symbol);
                 AddByShortName(model.ComponentsByShortName, symbol.Name, symbol);
@@ -192,7 +193,7 @@ internal sealed class SemanticAnalyzer
             foreach (var duplicate in duplicateFields)
                 _diagnostics.Report("FLX0308", $"prefab '{prefab.Name}' has duplicate flattened field '{duplicate.Key}'.", prefab.Location);
 
-            var symbol = new PrefabSymbol(module.SourceFile, prefab, prefab.Name, fullName, flattened);
+            var symbol = new PrefabSymbol(module.SourceFile, prefab, prefab.Name, fullName, flattened, prefab.IsExported);
             module.Prefabs.Add(symbol);
             model.PrefabsByFullName.Add(symbol.FullName, symbol);
             AddByShortName(model.PrefabsByShortName, symbol.Name, symbol);
@@ -228,8 +229,8 @@ internal sealed class SemanticAnalyzer
                 }
 
                 var sourceFile = ExternalSourceFile(package);
-                var syntax = new PrefabDeclSyntax(prefab.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package));
-                var symbol = new PrefabSymbol(sourceFile, syntax, prefab.Name, prefab.FullName, flattened);
+                var syntax = new PrefabDeclSyntax(prefab.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package), isExported: true);
+                var symbol = new PrefabSymbol(sourceFile, syntax, prefab.Name, prefab.FullName, flattened, isExported: true);
 
                 model.PrefabsByFullName.Add(symbol.FullName, symbol);
                 AddByShortName(model.PrefabsByShortName, symbol.Name, symbol);
@@ -283,7 +284,17 @@ internal sealed class SemanticAnalyzer
                 unit.Source.DisplayPath,
                 function.Name,
                 parameters.Select(parameter => CTypeNames.MapType(parameter.Type, model, module)));
-            var symbol = new FunctionSymbol(module, unit.Source, function, function.Name, fullName, mangledName, returnType, parameters, function.NameLocation);
+            var symbol = new FunctionSymbol(
+                module,
+                unit.Source,
+                function,
+                function.Name,
+                fullName,
+                mangledName,
+                returnType,
+                parameters,
+                function.NameLocation,
+                isExported: function.IsExported);
 
             module.Functions.Add(symbol);
             registry.TryAdd(symbol);
@@ -315,7 +326,8 @@ internal sealed class SemanticAnalyzer
                     "{}",
                     0,
                     ExternalLocation(package),
-                    ExternalLocation(package));
+                    ExternalLocation(package),
+                    isExported: true);
                 var parameters = function.Parameters.Select(parameter =>
                     new ParameterSymbol(parameter.Type, parameter.Name, ExternalLocation(package))).ToArray();
 
@@ -332,7 +344,8 @@ internal sealed class SemanticAnalyzer
                     function.ReturnType,
                     parameters,
                     ExternalLocation(package),
-                    isExternal: true)
+                    isExternal: true,
+                    isExported: true)
                 {
                     ReceiverType = function.ReceiverType
                 };
@@ -364,7 +377,7 @@ internal sealed class SemanticAnalyzer
                 continue;
             }
 
-            var symbol = new GlobalVariableSymbol(module, unit.Source, global, type, global.Name, fullName, global.Initializer, global.NameLocation);
+            var symbol = new GlobalVariableSymbol(module, unit.Source, global, type, global.Name, fullName, global.Initializer, global.NameLocation, global.IsExported);
             module.Globals.Add(symbol);
             model.GlobalsByFullName.Add(symbol.FullName, symbol);
             AddByShortName(model.GlobalsByShortName, symbol.Name, symbol);
@@ -424,9 +437,23 @@ internal sealed class SemanticAnalyzer
         else if (model.IsAmbiguousComponentName(typeName, module))
             _diagnostics.Report("FLX0404", $"type name '{typeName}' is ambiguous.", location);
         else if (dotIndex > 0)
-            _diagnostics.Report("FLX0405", $"type name '{typeName}' does not exist.", location);
+        {
+            if (model.HiddenExternalSymbols.Contains(typeName))
+                _diagnostics.Report("FLX0603", $"symbol '{typeName}' is not visible from this package.", location);
+            else
+                _diagnostics.Report("FLX0405", $"type name '{typeName}' does not exist.", location);
+        }
 
         return typeName;
+    }
+
+    private static void BindHiddenExternalSymbols(CompilationModel model, IReadOnlyList<PackageMetadata> externalPackages)
+    {
+        foreach (var package in externalPackages)
+        {
+            foreach (var symbol in package.HiddenSymbols)
+                model.HiddenExternalSymbols.Add(symbol);
+        }
     }
 
     private bool CheckReservedProgramArgumentSymbol(string name, SourceLocation location)
