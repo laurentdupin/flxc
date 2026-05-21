@@ -1,0 +1,4 @@
+module game.duplicate.a;
+
+void SayHello(game.zombie.Zombie z) {
+}

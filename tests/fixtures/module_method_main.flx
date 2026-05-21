@@ -1,0 +1,15 @@
+module game.main;
+
+void CreateZombies() {
+    game.zombie.Zombie z = create game.zombie.Zombie;
+    z.name = "Marcus";
+}
+
+void Greet(game.zombie.Zombie z) {
+    z.SayHello();
+}
+
+schedule {
+    run CreateZombies;
+    run Greet;
+}

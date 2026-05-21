@@ -29,6 +29,7 @@ internal static class MetadataWriter
                 FullName = function.FullName,
                 MangledName = function.MangledName,
                 ReturnType = function.ReturnType,
+                ReceiverType = function.ReceiverType,
                 Parameters = function.Parameters.Select(parameter => new ParameterMetadata
                 {
                     Type = parameter.Type,

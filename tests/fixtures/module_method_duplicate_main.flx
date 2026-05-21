@@ -1,0 +1,5 @@
+module game.duplicate.main;
+
+schedule {
+    run game.duplicate.a.SayHello;
+}

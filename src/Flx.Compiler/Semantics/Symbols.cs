@@ -132,6 +132,7 @@ internal sealed class FunctionSymbol
     public string ReturnType { get; }
     public IReadOnlyList<ParameterSymbol> Parameters { get; }
     public SourceLocation Location { get; }
+    public string? ReceiverType { get; set; }
     public bool NeedsWorld => Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
 }
 
@@ -192,6 +193,7 @@ internal sealed class CompilationModel
 {
     public List<ModuleSymbol> Modules { get; } = [];
     public FunctionRegistry FunctionRegistry { get; } = new();
+    public MethodRegistry MethodRegistry { get; } = new();
     public Dictionary<string, GlobalVariableSymbol> GlobalsByFullName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, List<GlobalVariableSymbol>> GlobalsByShortName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, ComponentSymbol> ComponentsByFullName { get; } = new(StringComparer.Ordinal);

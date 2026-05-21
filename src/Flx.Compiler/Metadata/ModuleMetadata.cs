@@ -18,6 +18,7 @@ internal sealed class FunctionMetadata
     public string FullName { get; set; } = "";
     public string MangledName { get; set; } = "";
     public string ReturnType { get; set; } = "";
+    public string? ReceiverType { get; set; }
     public List<ParameterMetadata> Parameters { get; set; } = [];
     public int Line { get; set; }
     public int Column { get; set; }

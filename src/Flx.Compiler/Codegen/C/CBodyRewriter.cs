@@ -182,7 +182,8 @@ internal static class CBodyRewriter
                     body[afterMemberWhitespace] == '(' &&
                     memberName is not ("c_str" or "length" or "empty" or "clone"))
                 {
-                    diagnostics?.Report("FLX0200", $"unknown C import alias '{identifier}'.", source.GetLocation(bodyStart + identifierStart));
+                    if (diagnostics is not null && !IsZeroArgumentCall(body, afterMemberWhitespace))
+                        diagnostics.Report("FLX0200", $"unknown C import alias '{identifier}'.", source.GetLocation(bodyStart + identifierStart));
                     output.Append(body[identifierStart..memberEnd]);
                     position = memberEnd;
                     return true;
@@ -243,6 +244,15 @@ internal static class CBodyRewriter
         while (position < text.Length && char.IsWhiteSpace(text[position]))
             position++;
         return position;
+    }
+
+    private static bool IsZeroArgumentCall(string text, int openParen)
+    {
+        var position = openParen + 1;
+        while (position < text.Length && char.IsWhiteSpace(text[position]))
+            position++;
+
+        return position < text.Length && text[position] == ')';
     }
 
     private static void CopyStringLike(string body, StringBuilder output, ref int position, char quote)

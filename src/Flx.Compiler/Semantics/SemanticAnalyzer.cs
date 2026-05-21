@@ -44,6 +44,7 @@ internal sealed class SemanticAnalyzer
         foreach (var module in model.Modules)
             BindFunctions(module.Syntax, module, model, model.FunctionRegistry);
 
+        RegisterMethods(model);
         CheckSchedules(model, requireSchedule, validateScheduleTargets);
         CheckFunctionBodies(model);
 
@@ -233,6 +234,36 @@ internal sealed class SemanticAnalyzer
             module.Globals.Add(symbol);
             model.GlobalsByFullName.Add(symbol.FullName, symbol);
             AddByShortName(model.GlobalsByShortName, symbol.Name, symbol);
+        }
+    }
+
+    private void RegisterMethods(CompilationModel model)
+    {
+        foreach (var function in model.FunctionRegistry.AllFunctions)
+        {
+            if (function.Parameters.Count == 0)
+                continue;
+
+            var receiverType = function.Parameters[0].Type;
+            if (!model.PrefabsByFullName.TryGetValue(receiverType, out var receiver))
+                continue;
+
+            function.ReceiverType = receiver.FullName;
+            if (!model.MethodRegistry.TryAdd(function, receiver, out var existing))
+            {
+                _diagnostics.Report(
+                    "FLX0407",
+                    $"duplicate method '{function.SourceName}' for receiver '{receiver.FullName}'.",
+                    function.Location);
+
+                if (existing is not null)
+                {
+                    _diagnostics.Report(
+                        "FLX0407",
+                        $"previous method '{existing.SourceName}' for receiver '{receiver.FullName}' is here.",
+                        existing.Location);
+                }
+            }
         }
     }
 

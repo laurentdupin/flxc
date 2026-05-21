@@ -10,6 +10,7 @@ internal sealed class CBodyLowerer
     private readonly FunctionSymbol _function;
     private readonly ModuleSymbol _module;
     private readonly CompilationModel _model;
+    private int _temporaryIndex;
 
     public CBodyLowerer(FunctionSymbol function, ModuleSymbol module, CompilationModel model)
     {
@@ -114,8 +115,18 @@ internal sealed class CBodyLowerer
         if (fieldAssignment.Success &&
             TryResolvePrefabField(scope, fieldAssignment.Groups["target"].Value, fieldAssignment.Groups["field"].Value, out var target, out var field))
         {
-            var value = LowerStringSourceExpression(fieldAssignment.Groups["value"].Value.Trim(), scope);
-            builder.AppendLine($"{indent}flx_string_assign(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name}, {value});");
+            var valueText = fieldAssignment.Groups["value"].Value.Trim();
+            var fieldTarget = $"&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name}";
+            if (IsStringLiteral(valueText))
+            {
+                var temporaryName = NextTemporaryName();
+                builder.AppendLine($"{indent}flx_string {temporaryName} = flx_string_from_static({valueText}, {StringLiteralLength(valueText)});");
+                builder.AppendLine($"{indent}flx_string_assign({fieldTarget}, &{temporaryName});");
+                return;
+            }
+
+            var value = LowerStringSourceExpression(valueText, scope);
+            builder.AppendLine($"{indent}flx_string_assign({fieldTarget}, {value});");
             return;
         }
 
@@ -181,6 +192,28 @@ internal sealed class CBodyLowerer
                     "string" => $"flx_string_length(&{name})",
                     _ => match.Value
                 };
+            });
+
+        lowered = Regex.Replace(
+            lowered,
+            @"\b(?<target>[A-Za-z_][A-Za-z0-9_]*)\.(?<method>[A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(?<args>[^()]*)\s*\)",
+            match =>
+            {
+                var target = match.Groups["target"].Value;
+                var receiverType = scope.Lookup(target);
+                if (receiverType is null || !_model.PrefabsByFullName.ContainsKey(receiverType))
+                    return match.Value;
+
+                var args = match.Groups["args"].Value.Trim();
+                if (args.Length != 0)
+                    return match.Value;
+
+                var methods = _model.MethodRegistry.Resolve(receiverType, match.Groups["method"].Value, argumentCount: 0);
+                if (methods.Count != 1)
+                    return match.Value;
+
+                var worldArgument = methods[0].NeedsWorld ? "world, " : "";
+                return $"{methods[0].MangledName}({worldArgument}{target})";
             });
 
         return lowered;
@@ -435,6 +468,16 @@ internal sealed class CBodyLowerer
         }
 
         return length;
+    }
+
+    private static bool IsStringLiteral(string expression)
+    {
+        return Regex.IsMatch(expression, "^\"(?:\\\\.|[^\"\\\\])*\"$");
+    }
+
+    private string NextTemporaryName()
+    {
+        return $"__flx_tmp_{_temporaryIndex++}";
     }
 
     private static string StripOuterBlock(string text)
