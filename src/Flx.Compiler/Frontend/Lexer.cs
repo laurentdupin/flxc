@@ -64,7 +64,6 @@ internal sealed class Lexer
 
     private Token UnknownToken(char current, int start, SourceLocation location)
     {
-        _diagnostics.Report("FLX0002", $"unexpected character '{current}'.", location);
         return new Token(TokenKind.Unknown, current.ToString(), null, start, _position, location);
     }
 
@@ -83,6 +82,8 @@ internal sealed class Lexer
             "void" => TokenKind.VoidKeyword,
             "schedule" => TokenKind.ScheduleKeyword,
             "run" => TokenKind.RunKeyword,
+            "component" => TokenKind.ComponentKeyword,
+            "prefab" => TokenKind.PrefabKeyword,
             _ => TokenKind.Identifier
         };
 

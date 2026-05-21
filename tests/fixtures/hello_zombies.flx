@@ -1,0 +1,27 @@
+import c "stdio.h" as stdio
+
+component ZombieData {
+    string name = "";
+}
+
+prefab Zombie {
+    flatten ZombieData;
+}
+
+void HelloZombie(Zombie z) {
+    stdio.printf("Hello, my name is %s\n", z.name.c_str());
+}
+
+void CreateZombies() {
+    Array<string> names = ["Marcus", "Henry", "Lewis", "John", "Felipe", "Paul", "Cole"];
+
+    for (usize i = 0; i < names.length(); ++i) {
+        Zombie z = create Zombie;
+        z.name = names[i];
+    }
+}
+
+schedule {
+    run CreateZombies;
+    run HelloZombie;
+}

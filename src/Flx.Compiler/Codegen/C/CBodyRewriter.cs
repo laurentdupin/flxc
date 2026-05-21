@@ -78,6 +78,9 @@ internal static class CBodyRewriter
         DiagnosticBag? diagnostics)
     {
         var identifierStart = position;
+        if (IsMemberChainSegment(body, identifierStart))
+            return false;
+
         var identifierEnd = ReadIdentifier(body, identifierStart);
         var afterAliasWhitespace = SkipWhitespace(body, identifierEnd);
 
@@ -90,9 +93,13 @@ internal static class CBodyRewriter
 
         var memberStart = afterDotWhitespace;
         var memberEnd = ReadIdentifier(body, memberStart);
+        var memberName = body[memberStart..memberEnd];
         var afterMemberWhitespace = SkipWhitespace(body, memberEnd);
 
         if (afterMemberWhitespace >= body.Length || body[afterMemberWhitespace] != '(')
+            return false;
+
+        if (memberName is "c_str" or "length" or "empty" or "clone")
             return false;
 
         var alias = body[identifierStart..identifierEnd];
@@ -107,6 +114,15 @@ internal static class CBodyRewriter
         output.Append(body[memberStart..memberEnd]);
         position = memberEnd;
         return true;
+    }
+
+    private static bool IsMemberChainSegment(string body, int identifierStart)
+    {
+        var position = identifierStart - 1;
+        while (position >= 0 && char.IsWhiteSpace(body[position]))
+            position--;
+
+        return position >= 0 && body[position] == '.';
     }
 
     private static int ReadIdentifier(string text, int start)

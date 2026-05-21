@@ -16,8 +16,14 @@ internal sealed class CMainGenerator
         builder.AppendLine("/* Schedule main */");
         builder.AppendLine();
 
+        if (model.RequiresRuntime)
+        {
+            builder.AppendLine("#include \"flx_runtime.g.h\"");
+            builder.AppendLine();
+        }
+
         foreach (var function in calls.DistinctBy(function => function.MangledName).OrderBy(function => function.MangledName, StringComparer.Ordinal))
-            builder.AppendLine($"extern {function.ReturnType} {function.MangledName}(void);");
+            builder.AppendLine(CTypeNames.FormatExternPrototype(function, model));
 
         builder.AppendLine();
         builder.AppendLine("int main(int argc, char **argv) {");
@@ -25,8 +31,21 @@ internal sealed class CMainGenerator
         builder.AppendLine("    (void)argv;");
         builder.AppendLine();
 
+        if (model.RequiresRuntime)
+        {
+            builder.AppendLine("    flx_world world;");
+            builder.AppendLine("    flx_world_init(&world);");
+            builder.AppendLine();
+        }
+
         foreach (var function in calls)
-            builder.AppendLine($"    {function.MangledName}();");
+            AppendScheduleCall(builder, function, model);
+
+        if (model.RequiresRuntime)
+        {
+            builder.AppendLine();
+            builder.AppendLine("    flx_world_destroy(&world);");
+        }
 
         builder.AppendLine();
         builder.AppendLine("    return 0;");
@@ -41,7 +60,8 @@ internal sealed class CMainGenerator
         {
             foreach (var function in model.FunctionRegistry
                          .LookupSourceName(step.Name)
-                         .Where(function => function.Parameters.Count == 0)
+                .Where(function => function.Parameters.Count == 0 ||
+                                   (function.Parameters.Count == 1 && model.PrefabsByName.ContainsKey(function.Parameters[0].Type)))
                          .OrderBy(function => function.SourceFile.DisplayPath, StringComparer.Ordinal)
                          .ThenBy(function => function.Location.Line)
                          .ThenBy(function => function.MangledName, StringComparer.Ordinal))
@@ -49,5 +69,21 @@ internal sealed class CMainGenerator
                 yield return function;
             }
         }
+    }
+
+    private static void AppendScheduleCall(StringBuilder builder, FunctionSymbol function, CompilationModel model)
+    {
+        if (function.Parameters.Count == 0)
+        {
+            var args = function.NeedsWorld ? "&world" : "";
+            builder.AppendLine($"    {function.MangledName}({args});");
+            return;
+        }
+
+        var prefabName = function.Parameters[0].Type;
+        builder.AppendLine($"    for (usize i = 0; i < world.{CTypeNames.CountField(prefabName)}; ++i) {{");
+        builder.AppendLine($"        {CTypeNames.ViewType(prefabName)} {function.Parameters[0].Name} = {CTypeNames.GetFunction(prefabName)}(&world, i);");
+        builder.AppendLine($"        {function.MangledName}({function.Parameters[0].Name});");
+        builder.AppendLine("    }");
     }
 }

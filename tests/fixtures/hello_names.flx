@@ -1,0 +1,13 @@
+import c "stdio.h" as stdio
+
+void HelloNames() {
+    Array<string> names = ["Marcus", "Henry", "Lewis"];
+
+    for (usize i = 0; i < names.length(); ++i) {
+        stdio.printf("Hello, my name is %s\n", names[i].c_str());
+    }
+}
+
+schedule {
+    run HelloNames;
+}

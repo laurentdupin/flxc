@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using Flx.Compiler.Semantics;
 
@@ -10,6 +11,7 @@ internal static class MetadataWriter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         WriteIndented = true
     };
 
@@ -36,6 +38,21 @@ internal static class MetadataWriter
             {
                 Header = import.Header,
                 Alias = import.Alias
+            }).ToList(),
+            Components = module.Components.Select(component => new ComponentMetadata
+            {
+                Name = component.Name,
+                Fields = component.Fields.Select(field => new ComponentFieldMetadata
+                {
+                    Type = field.Type,
+                    Name = field.Name,
+                    DefaultValue = field.DefaultValue
+                }).ToList()
+            }).ToList(),
+            Prefabs = module.Prefabs.Select(prefab => new PrefabMetadata
+            {
+                Name = prefab.Name,
+                FlattenedComponents = prefab.FlattenedComponents.Select(component => component.Name).ToList()
             }).ToList()
         };
 

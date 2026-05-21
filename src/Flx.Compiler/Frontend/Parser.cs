@@ -30,6 +30,12 @@ internal sealed class Parser
                 case TokenKind.ScheduleKeyword:
                     unit.Schedules.Add(ParseSchedule());
                     break;
+                case TokenKind.ComponentKeyword:
+                    unit.Components.Add(ParseComponent());
+                    break;
+                case TokenKind.PrefabKeyword:
+                    unit.Prefabs.Add(ParsePrefab());
+                    break;
                 case TokenKind.VoidKeyword:
                 case TokenKind.Identifier:
                     unit.Functions.Add(ParseFunction());
@@ -58,6 +64,22 @@ internal sealed class Parser
         return new CImportSyntax(header.Value ?? "", alias.Text, importToken.Location);
     }
 
+    private ComponentDeclSyntax ParseComponent()
+    {
+        var componentToken = Expect(TokenKind.ComponentKeyword, "expected 'component'.");
+        var name = ExpectIdentifier("expected component name.");
+        var (bodyText, bodyStart) = ParseRawBlock("expected component body.", "unterminated component body.");
+        return new ComponentDeclSyntax(name.Text, bodyText, bodyStart, componentToken.Location, name.Location);
+    }
+
+    private PrefabDeclSyntax ParsePrefab()
+    {
+        var prefabToken = Expect(TokenKind.PrefabKeyword, "expected 'prefab'.");
+        var name = ExpectIdentifier("expected prefab name.");
+        var (bodyText, bodyStart) = ParseRawBlock("expected prefab body.", "unterminated prefab body.");
+        return new PrefabDeclSyntax(name.Text, bodyText, bodyStart, prefabToken.Location, name.Location);
+    }
+
     private FunctionDeclSyntax ParseFunction()
     {
         var returnType = ParseTypeName("expected function return type.");
@@ -67,34 +89,40 @@ internal sealed class Parser
         var parameters = ParseParameterList();
         Expect(TokenKind.RightParen, "expected ')' after function parameters.");
 
-        var openBrace = Expect(TokenKind.LeftBrace, "expected function body.");
+        var (bodyText, bodyStart) = ParseRawBlock("expected function body.", "unterminated function body.");
+
+        return new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location);
+    }
+
+    private (string BodyText, int BodyStart) ParseRawBlock(string expectedMessage, string unterminatedMessage)
+    {
+        var openBrace = Expect(TokenKind.LeftBrace, expectedMessage);
         var bodyText = "";
         var bodyStart = openBrace.Start;
 
-        if (openBrace.Kind == TokenKind.LeftBrace)
+        if (openBrace.Kind != TokenKind.LeftBrace)
+            return (bodyText, bodyStart);
+
+        var depth = 1;
+        var closeEnd = openBrace.End;
+
+        while (Current.Kind != TokenKind.EndOfFile && depth > 0)
         {
-            var depth = 1;
-            var closeEnd = openBrace.End;
+            var token = Advance();
+            if (token.Kind == TokenKind.LeftBrace)
+                depth++;
+            else if (token.Kind == TokenKind.RightBrace)
+                depth--;
 
-            while (Current.Kind != TokenKind.EndOfFile && depth > 0)
-            {
-                var token = Advance();
-                if (token.Kind == TokenKind.LeftBrace)
-                    depth++;
-                else if (token.Kind == TokenKind.RightBrace)
-                    depth--;
-
-                closeEnd = token.End;
-            }
-
-            if (depth != 0)
-                _diagnostics.Report("FLX0006", "unterminated function body.", openBrace.Location);
-
-            var length = Math.Clamp(closeEnd - bodyStart, 0, _source.Text.Length - bodyStart);
-            bodyText = _source.Text.Substring(bodyStart, length);
+            closeEnd = token.End;
         }
 
-        return new FunctionDeclSyntax(returnType, name.Text, parameters, bodyText, bodyStart, declarationLocation, name.Location);
+        if (depth != 0)
+            _diagnostics.Report("FLX0006", unterminatedMessage, openBrace.Location);
+
+        var length = Math.Clamp(closeEnd - bodyStart, 0, _source.Text.Length - bodyStart);
+        bodyText = _source.Text.Substring(bodyStart, length);
+        return (bodyText, bodyStart);
     }
 
     private IReadOnlyList<ParameterSyntax> ParseParameterList()

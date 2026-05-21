@@ -1,6 +1,7 @@
 using Flx.Compiler.Codegen.C;
 using Flx.Compiler.Diagnostics;
 using Flx.Compiler.Frontend;
+using System.Text.RegularExpressions;
 
 namespace Flx.Compiler.Semantics;
 
@@ -22,14 +23,112 @@ internal sealed class SemanticAnalyzer
             var module = new ModuleSymbol(unit.Source, unit);
             model.Modules.Add(module);
             BindImports(unit, module);
-            BindFunctions(unit, module, model.FunctionRegistry);
             model.Schedules.AddRange(unit.Schedules);
         }
+
+        foreach (var module in model.Modules)
+            BindComponents(module, model);
+
+        foreach (var module in model.Modules)
+            BindPrefabs(module, model);
+
+        foreach (var module in model.Modules)
+            BindFunctions(module.Syntax, module, model.FunctionRegistry);
 
         CheckSchedules(model, requireSchedule, validateScheduleTargets);
         CheckFunctionBodies(model);
 
         return model;
+    }
+
+    private void BindComponents(ModuleSymbol module, CompilationModel model)
+    {
+        foreach (var component in module.Syntax.Components)
+        {
+            if (model.ComponentsByName.ContainsKey(component.Name))
+            {
+                _diagnostics.Report("FLX0302", $"duplicate component '{component.Name}'.", component.NameLocation);
+                continue;
+            }
+
+            var fields = ParseComponentFields(component, module.SourceFile);
+            var symbol = new ComponentSymbol(module.SourceFile, component, component.Name, fields);
+            module.Components.Add(symbol);
+            model.ComponentsByName.Add(symbol.Name, symbol);
+        }
+    }
+
+    private IReadOnlyList<ComponentFieldSymbol> ParseComponentFields(ComponentDeclSyntax component, SourceFile sourceFile)
+    {
+        var fields = new List<ComponentFieldSymbol>();
+        var content = StripOuterBlock(component.BodyText);
+        var pattern = new Regex(
+            @"(?<type>[A-Za-z_][A-Za-z0-9_]*)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*(?<default>""(?:\\.|[^""\\])*""))?\s*;",
+            RegexOptions.Multiline);
+
+        foreach (Match match in pattern.Matches(content))
+        {
+            var type = match.Groups["type"].Value;
+            var name = match.Groups["name"].Value;
+            var defaultValue = match.Groups["default"].Success ? match.Groups["default"].Value : null;
+            var location = sourceFile.GetLocation(component.BodyStart + 1 + match.Groups["name"].Index);
+
+            if (type != "string")
+                _diagnostics.Report("FLX0303", $"component field type '{type}' is not implemented yet.", location);
+
+            fields.Add(new ComponentFieldSymbol(type, name, defaultValue, location));
+        }
+
+        if (fields.Count == 0 && !string.IsNullOrWhiteSpace(content))
+            _diagnostics.Report("FLX0304", $"component '{component.Name}' contains unsupported field declarations.", component.Location);
+
+        return fields;
+    }
+
+    private void BindPrefabs(ModuleSymbol module, CompilationModel model)
+    {
+        foreach (var prefab in module.Syntax.Prefabs)
+        {
+            if (model.PrefabsByName.ContainsKey(prefab.Name))
+            {
+                _diagnostics.Report("FLX0305", $"duplicate prefab '{prefab.Name}'.", prefab.NameLocation);
+                continue;
+            }
+
+            var flattened = new List<ComponentSymbol>();
+            var content = StripOuterBlock(prefab.BodyText);
+            var pattern = new Regex(@"\bflatten\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Multiline);
+
+            foreach (Match match in pattern.Matches(content))
+            {
+                var componentName = match.Groups["name"].Value;
+                if (!model.ComponentsByName.TryGetValue(componentName, out var component))
+                {
+                    _diagnostics.Report(
+                        "FLX0306",
+                        $"flatten target component '{componentName}' does not exist.",
+                        module.SourceFile.GetLocation(prefab.BodyStart + 1 + match.Groups["name"].Index));
+                    continue;
+                }
+
+                flattened.Add(component);
+            }
+
+            if (flattened.Count == 0)
+                _diagnostics.Report("FLX0307", $"prefab '{prefab.Name}' must flatten at least one component.", prefab.Location);
+
+            var duplicateFields = flattened
+                .SelectMany(component => component.Fields)
+                .GroupBy(field => field.Name, StringComparer.Ordinal)
+                .Where(group => group.Count() > 1);
+
+            foreach (var duplicate in duplicateFields)
+                _diagnostics.Report("FLX0308", $"prefab '{prefab.Name}' has duplicate flattened field '{duplicate.Key}'.", prefab.Location);
+
+            var symbol = new PrefabSymbol(module.SourceFile, prefab, prefab.Name, flattened);
+            module.Prefabs.Add(symbol);
+            model.PrefabsByName.Add(symbol.Name, symbol);
+        }
     }
 
     private void BindImports(CompilationUnitSyntax unit, ModuleSymbol module)
@@ -103,7 +202,7 @@ internal sealed class SemanticAnalyzer
                 continue;
             }
 
-            foreach (var overload in overloads.Where(function => function.Parameters.Count > 0))
+            foreach (var overload in overloads.Where(function => !IsRunnableInMvp(function, model)))
             {
                 _diagnostics.Report(
                     "FLX0104",
@@ -111,6 +210,14 @@ internal sealed class SemanticAnalyzer
                     step.Location);
             }
         }
+    }
+
+    private static bool IsRunnableInMvp(FunctionSymbol function, CompilationModel model)
+    {
+        if (function.Parameters.Count == 0)
+            return true;
+
+        return function.Parameters.Count == 1 && model.PrefabsByName.ContainsKey(function.Parameters[0].Type);
     }
 
     private void CheckFunctionBodies(CompilationModel model)
@@ -135,5 +242,13 @@ internal sealed class SemanticAnalyzer
             return $"{name}()";
 
         return $"{name}({string.Join(", ", parameters.Select(parameter => parameter.Type))})";
+    }
+
+    private static string StripOuterBlock(string text)
+    {
+        var trimmed = text.Trim();
+        return trimmed.Length >= 2 && trimmed[0] == '{' && trimmed[^1] == '}'
+            ? trimmed[1..^1]
+            : text;
     }
 }

@@ -11,6 +11,8 @@ internal sealed class CompilationUnitSyntax
 
     public SourceFile Source { get; }
     public List<CImportSyntax> CImports { get; } = [];
+    public List<ComponentDeclSyntax> Components { get; } = [];
+    public List<PrefabDeclSyntax> Prefabs { get; } = [];
     public List<FunctionDeclSyntax> Functions { get; } = [];
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
 }
@@ -55,6 +57,42 @@ internal sealed class FunctionDeclSyntax
     public string BodyText { get; }
     public int BodyStart { get; }
     public SourceLocation DeclarationLocation { get; }
+    public SourceLocation NameLocation { get; }
+}
+
+internal sealed class ComponentDeclSyntax
+{
+    public ComponentDeclSyntax(string name, string bodyText, int bodyStart, SourceLocation location, SourceLocation nameLocation)
+    {
+        Name = name;
+        BodyText = bodyText;
+        BodyStart = bodyStart;
+        Location = location;
+        NameLocation = nameLocation;
+    }
+
+    public string Name { get; }
+    public string BodyText { get; }
+    public int BodyStart { get; }
+    public SourceLocation Location { get; }
+    public SourceLocation NameLocation { get; }
+}
+
+internal sealed class PrefabDeclSyntax
+{
+    public PrefabDeclSyntax(string name, string bodyText, int bodyStart, SourceLocation location, SourceLocation nameLocation)
+    {
+        Name = name;
+        BodyText = bodyText;
+        BodyStart = bodyStart;
+        Location = location;
+        NameLocation = nameLocation;
+    }
+
+    public string Name { get; }
+    public string BodyText { get; }
+    public int BodyStart { get; }
+    public SourceLocation Location { get; }
     public SourceLocation NameLocation { get; }
 }
 

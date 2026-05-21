@@ -13,6 +13,8 @@ internal enum TokenKind
     VoidKeyword,
     ScheduleKeyword,
     RunKeyword,
+    ComponentKeyword,
+    PrefabKeyword,
     LeftParen,
     RightParen,
     LeftBrace,

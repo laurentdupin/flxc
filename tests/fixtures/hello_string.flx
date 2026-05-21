@@ -1,0 +1,10 @@
+import c "stdio.h" as stdio
+
+void HelloString() {
+    string name = "Marcus";
+    stdio.printf("Hello, my name is %s\n", name.c_str());
+}
+
+schedule {
+    run HelloString;
+}
