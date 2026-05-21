@@ -28,3 +28,15 @@ internal sealed class FlxSymbolDefinition
     public required string Path { get; init; }
     public required FlxRange Range { get; init; }
 }
+
+public sealed class FlxSymbolInfo
+{
+    public required string Key { get; init; }
+    public required string FullName { get; init; }
+    public required FlxSymbolKind Kind { get; init; }
+    public required string Display { get; init; }
+    public string? Detail { get; init; }
+    public string? PackageName { get; init; }
+    public string? ModuleName { get; init; }
+    public string? SourcePath { get; init; }
+}

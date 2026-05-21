@@ -31,7 +31,21 @@ if (arguments.Contains("--smoke-definition", StringComparer.Ordinal))
         return 2;
     }
 
-    return await RunSmokeAsync(arguments[index + 1], new SmokeDefinitionPosition(line, character));
+    return await RunSmokeAsync(arguments[index + 1], new SmokePosition("textDocument/definition", line, character));
+}
+
+if (arguments.Contains("--smoke-hover", StringComparer.Ordinal))
+{
+    var index = arguments.IndexOf("--smoke-hover");
+    if (index + 3 >= arguments.Count ||
+        !int.TryParse(arguments[index + 2], out var line) ||
+        !int.TryParse(arguments[index + 3], out var character))
+    {
+        Console.Error.WriteLine("usage: flx-lsp --smoke-hover <file.flx> <zero-based-line> <zero-based-character>");
+        return 2;
+    }
+
+    return await RunSmokeAsync(arguments[index + 1], new SmokePosition("textDocument/hover", line, character));
 }
 
 if (!arguments.Contains("--stdio", StringComparer.Ordinal))
@@ -39,6 +53,7 @@ if (!arguments.Contains("--stdio", StringComparer.Ordinal))
     Console.Error.WriteLine("usage: flx-lsp --stdio [--log <path>]");
     Console.Error.WriteLine("       flx-lsp --smoke <file.flx>");
     Console.Error.WriteLine("       flx-lsp --smoke-definition <file.flx> <zero-based-line> <zero-based-character>");
+    Console.Error.WriteLine("       flx-lsp --smoke-hover <file.flx> <zero-based-line> <zero-based-character>");
     return 2;
 }
 
@@ -52,7 +67,7 @@ static async Task<int> RunStdioAsync(string? logPath)
     return 0;
 }
 
-static async Task<int> RunSmokeAsync(string filePath, SmokeDefinitionPosition? definitionPosition)
+static async Task<int> RunSmokeAsync(string filePath, SmokePosition? positionRequest)
 {
     var fullPath = Path.GetFullPath(filePath);
     var uri = new Uri(fullPath).AbsoluteUri;
@@ -96,13 +111,13 @@ static async Task<int> RunSmokeAsync(string filePath, SmokeDefinitionPosition? d
     });
 
     var shutdownId = 3;
-    if (definitionPosition is not null)
+    if (positionRequest is not null)
     {
         await WriteFrameAsync(input, new
         {
             jsonrpc = "2.0",
             id = 3,
-            method = "textDocument/definition",
+            method = positionRequest.Method,
             @params = new
             {
                 textDocument = new
@@ -111,8 +126,8 @@ static async Task<int> RunSmokeAsync(string filePath, SmokeDefinitionPosition? d
                 },
                 position = new
                 {
-                    line = definitionPosition.Line,
-                    character = definitionPosition.Character
+                    line = positionRequest.Line,
+                    character = positionRequest.Character
                 }
             }
         });
@@ -178,4 +193,4 @@ static async Task WriteFrameAsync(Stream stream, object message)
     await stream.WriteAsync(body);
 }
 
-internal sealed record SmokeDefinitionPosition(int Line, int Character);
+internal sealed record SmokePosition(string Method, int Line, int Character);

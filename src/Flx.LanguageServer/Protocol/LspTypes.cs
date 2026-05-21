@@ -43,6 +43,18 @@ internal sealed class LspLocation
     public required LspRange Range { get; init; }
 }
 
+internal sealed class MarkupContent
+{
+    public string Kind { get; init; } = "markdown";
+    public required string Value { get; init; }
+}
+
+internal sealed class LspHover
+{
+    public required MarkupContent Contents { get; init; }
+    public LspRange? Range { get; init; }
+}
+
 internal sealed class LspDiagnostic
 {
     public required LspRange Range { get; init; }
@@ -161,6 +173,18 @@ internal static class LspTypeConversions
         {
             Uri = new Uri(Path.GetFullPath(definition.Path)).AbsoluteUri,
             Range = ToLspRange(definition.Range)
+        };
+    }
+
+    public static LspHover ToLspHover(FlxHoverResult hover)
+    {
+        return new LspHover
+        {
+            Contents = new MarkupContent
+            {
+                Value = hover.Text
+            },
+            Range = hover.Range is null ? null : ToLspRange(hover.Range.Value)
         };
     }
 

@@ -1,5 +1,6 @@
 using Flx.Compiler.Diagnostics;
 using Flx.Compiler.Frontend;
+using Flx.Compiler.Metadata;
 using Flx.Compiler.Packages;
 using Flx.Compiler.Semantics;
 using System.Text.RegularExpressions;
@@ -114,7 +115,9 @@ public sealed class FlxWorkspace
             diagnostics.Diagnostics.Select(ConvertDiagnostic).ToArray(),
             CollectDocumentSymbols(model).ToArray(),
             CollectReferences(model).ToArray(),
-            CollectDefinitions(model, packageGraph));
+            CollectDefinitions(model, packageGraph),
+            CollectSymbolInfos(model, packageGraph),
+            sources.ToDictionary(source => source.FullPath, source => source.Text, StringComparer.OrdinalIgnoreCase));
     }
 
     private PackageGraph? LoadPackageGraph(DiagnosticBag diagnostics)
@@ -408,6 +411,169 @@ public sealed class FlxWorkspace
                     function.FullName);
             }
         }
+    }
+
+    private static IReadOnlyDictionary<string, FlxSymbolInfo> CollectSymbolInfos(
+        CompilationModel model,
+        PackageGraph? packageGraph)
+    {
+        var infos = new Dictionary<string, FlxSymbolInfo>(StringComparer.Ordinal);
+        foreach (var module in model.Modules)
+        {
+            if (module.Syntax.Module is not null)
+            {
+                infos[ModuleKey(module.Name)] = new FlxSymbolInfo
+                {
+                    Key = ModuleKey(module.Name),
+                    FullName = module.Name,
+                    Kind = FlxSymbolKind.Module,
+                    Display = $"module {module.Name}",
+                    PackageName = module.SourceFile.PackageName,
+                    ModuleName = module.Name,
+                    SourcePath = module.SourceFile.FullPath
+                };
+            }
+
+            foreach (var component in module.Components)
+                infos[ComponentKey(component.FullName)] = new FlxSymbolInfo
+                {
+                    Key = ComponentKey(component.FullName),
+                    FullName = component.FullName,
+                    Kind = FlxSymbolKind.Component,
+                    Display = $"component {component.FullName}",
+                    Detail = FormatComponentFields(component.Fields),
+                    PackageName = component.SourceFile.PackageName,
+                    ModuleName = module.Name,
+                    SourcePath = component.SourceFile.FullPath
+                };
+
+            foreach (var prefab in module.Prefabs)
+                infos[PrefabKey(prefab.FullName)] = new FlxSymbolInfo
+                {
+                    Key = PrefabKey(prefab.FullName),
+                    FullName = prefab.FullName,
+                    Kind = FlxSymbolKind.Prefab,
+                    Display = $"prefab {prefab.FullName}",
+                    Detail = FormatFlattenedComponents(prefab.FlattenedComponents),
+                    PackageName = prefab.SourceFile.PackageName,
+                    ModuleName = module.Name,
+                    SourcePath = prefab.SourceFile.FullPath
+                };
+
+            foreach (var global in module.Globals)
+                infos[GlobalKey(global.FullName)] = new FlxSymbolInfo
+                {
+                    Key = GlobalKey(global.FullName),
+                    FullName = global.FullName,
+                    Kind = FlxSymbolKind.Global,
+                    Display = $"global {global.Type} {global.FullName}",
+                    PackageName = global.SourceFile.PackageName,
+                    ModuleName = module.Name,
+                    SourcePath = global.SourceFile.FullPath
+                };
+
+            foreach (var function in module.Functions)
+                infos[FunctionKey(function)] = CreateFunctionInfo(function);
+        }
+
+        AddBinaryPackageSymbolInfos(packageGraph, infos);
+
+        foreach (var function in model.FunctionRegistry.AllFunctions.Where(function => function.IsExternal))
+            infos.TryAdd(FunctionKey(function), CreateFunctionInfo(function));
+
+        return infos;
+    }
+
+    private static void AddBinaryPackageSymbolInfos(
+        PackageGraph? packageGraph,
+        Dictionary<string, FlxSymbolInfo> infos)
+    {
+        if (packageGraph is null)
+            return;
+
+        foreach (var package in packageGraph.BinaryPackages)
+        {
+            foreach (var component in package.Metadata.Symbols.Components)
+            {
+                infos[ComponentKey(component.FullName)] = new FlxSymbolInfo
+                {
+                    Key = ComponentKey(component.FullName),
+                    FullName = component.FullName,
+                    Kind = FlxSymbolKind.Component,
+                    Display = $"component {component.FullName}",
+                    Detail = FormatComponentFields(component.Fields.Select(field =>
+                        new ComponentFieldSymbol(field.Type, field.Name, field.DefaultValue, default)).ToArray()),
+                    PackageName = package.Name,
+                    ModuleName = ModuleNameFromFullName(component.FullName, component.Name),
+                    SourcePath = package.MetadataPath
+                };
+            }
+
+            foreach (var prefab in package.Metadata.Symbols.Prefabs)
+            {
+                infos[PrefabKey(prefab.FullName)] = new FlxSymbolInfo
+                {
+                    Key = PrefabKey(prefab.FullName),
+                    FullName = prefab.FullName,
+                    Kind = FlxSymbolKind.Prefab,
+                    Display = $"prefab {prefab.FullName}",
+                    Detail = prefab.FlattenedComponents.Count == 0
+                        ? null
+                        : "flattens " + string.Join(", ", prefab.FlattenedComponents),
+                    PackageName = package.Name,
+                    ModuleName = ModuleNameFromFullName(prefab.FullName, prefab.Name),
+                    SourcePath = package.MetadataPath
+                };
+            }
+
+            foreach (var function in package.Metadata.Symbols.Functions)
+            {
+                var key = "function:" + function.MangledName;
+                infos[key] = new FlxSymbolInfo
+                {
+                    Key = key,
+                    FullName = function.FullName,
+                    Kind = function.ReceiverType is null ? FlxSymbolKind.Function : FlxSymbolKind.Method,
+                    Display = FormatFunctionMetadata(function),
+                    Detail = function.ReceiverType is null ? null : $"receiver {function.ReceiverType}",
+                    PackageName = package.Name,
+                    ModuleName = ModuleNameFromFullName(function.FullName, function.SourceName),
+                    SourcePath = package.MetadataPath
+                };
+            }
+        }
+    }
+
+    private static FlxSymbolInfo CreateFunctionInfo(FunctionSymbol function)
+    {
+        var kind = function.ReceiverType is null ? FlxSymbolKind.Function : FlxSymbolKind.Method;
+        return new FlxSymbolInfo
+        {
+            Key = FunctionKey(function),
+            FullName = function.FullName,
+            Kind = kind,
+            Display = FormatFunctionDetail(function),
+            Detail = function.ReceiverType is null ? null : $"receiver {function.ReceiverType}",
+            PackageName = function.SourceFile.PackageName,
+            ModuleName = function.Module.Name,
+            SourcePath = function.SourceFile.FullPath
+        };
+    }
+
+    private static string? FormatComponentFields(IReadOnlyList<ComponentFieldSymbol> fields)
+    {
+        if (fields.Count == 0)
+            return null;
+
+        return string.Join("\n", fields.Select(field => $"field {field.Name} : {field.Type}"));
+    }
+
+    private static string? FormatFlattenedComponents(IReadOnlyList<ComponentSymbol> components)
+    {
+        if (components.Count == 0)
+            return null;
+
+        return "flattens " + string.Join(", ", components.Select(component => component.FullName));
     }
 
     private static IEnumerable<FlxReference> CollectReferences(CompilationModel model)
@@ -854,6 +1020,22 @@ public sealed class FlxWorkspace
         var parameters = string.Join(", ", function.Parameters.Select(parameter => $"{parameter.Type} {parameter.Name}"));
         var prefix = function.ReceiverType is null ? "function" : "method";
         return $"{prefix} {function.ReturnType} {function.FullName}({parameters})";
+    }
+
+    private static string FormatFunctionMetadata(FunctionMetadata function)
+    {
+        var parameters = string.Join(", ", function.Parameters.Select(parameter => $"{parameter.Type} {parameter.Name}"));
+        var prefix = function.ReceiverType is null ? "function" : "method";
+        return $"{prefix} {function.ReturnType} {function.FullName}({parameters})";
+    }
+
+    private static string ModuleNameFromFullName(string fullName, string sourceName)
+    {
+        var suffix = "." + sourceName;
+        if (fullName.EndsWith(suffix, StringComparison.Ordinal))
+            return fullName[..^suffix.Length];
+
+        return "";
     }
 
     private static FlxDiagnostic ConvertDiagnostic(Diagnostic diagnostic)

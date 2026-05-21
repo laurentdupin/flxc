@@ -18,7 +18,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "publish:server": "dotnet publish ../../../src/Flx.LanguageServer/Flx.LanguageServer.csproj -c Release -o server",
+    "publish:server": "dotnet publish ../../../src/Flx.LanguageServer/Flx.LanguageServer.csproj -c Release -o server-bundle",
     "package": "npm run publish:server && vsce package"
   },
   "dependencies": {

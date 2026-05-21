@@ -300,6 +300,9 @@ FakesAssemblies/
 # Node.js Tools for Visual Studio
 .ntvs_analysis.dat
 node_modules/
+tools/vscode/flx/server/
+tools/vscode/flx/server-bundle/
+tools/vscode/flx/*.vsix
 
 # Visual Studio 6 build log
 *.plg

@@ -119,6 +119,11 @@ internal sealed class LspServer
                     await HandleDefinitionAsync(connection, id.Value, ReadParams<TextDocumentPositionParams>(root), cancellationToken);
                 return false;
 
+            case "textDocument/hover":
+                if (id is not null)
+                    await HandleHoverAsync(connection, id.Value, ReadParams<TextDocumentPositionParams>(root), cancellationToken);
+                return false;
+
             case "workspace/didChangeWatchedFiles":
                 await HandleDidChangeWatchedFilesAsync(connection, cancellationToken);
                 return false;
@@ -204,6 +209,21 @@ internal sealed class LspServer
         await SendResultAsync(connection, id, result, cancellationToken);
     }
 
+    private async Task HandleHoverAsync(
+        LspConnection connection,
+        JsonElement id,
+        TextDocumentPositionParams parameters,
+        CancellationToken cancellationToken)
+    {
+        var path = UriToPath(parameters.TextDocument.Uri);
+        var snapshot = Analyze(path);
+        var hover = snapshot.GetHover(path, parameters.Position.Line, parameters.Position.Character);
+        var result = hover is null ? null : LspTypeConversions.ToLspHover(hover);
+
+        await LogAsync($"hover {path}:{parameters.Position.Line}:{parameters.Position.Character}: {(hover is null ? "none" : hover.Text.ReplaceLineEndings(" | "))}");
+        await SendResultAsync(connection, id, result, cancellationToken);
+    }
+
     private async Task HandleDidChangeWatchedFilesAsync(
         LspConnection connection,
         CancellationToken cancellationToken)
@@ -272,7 +292,8 @@ internal sealed class LspServer
                     change = TextDocumentSyncKind.Full
                 },
                 documentSymbolProvider = true,
-                definitionProvider = true
+                definitionProvider = true,
+                hoverProvider = true
             },
             serverInfo = new
             {

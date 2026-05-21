@@ -2,5 +2,6 @@
 src/**
 tsconfig.json
 *.vsix
-server/**/*.pdb
-server/**/*.xml
+server/**
+server-bundle/**/*.pdb
+server-bundle/**/*.xml
