@@ -1,5 +1,6 @@
 using Flx.Compiler.Diagnostics;
 using Flx.Compiler.Frontend;
+using System.Text.RegularExpressions;
 
 namespace Flx.Compiler.Semantics;
 
@@ -183,8 +184,11 @@ internal sealed class CompilationModel
     public Dictionary<string, PrefabSymbol> PrefabsByName { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
     public ScheduleDeclSyntax? Schedule => Schedules.Count == 1 ? Schedules[0] : null;
+    public bool RequiresProgramArguments => FunctionRegistry.AllFunctions.Any(function =>
+        ContainsProgramArgumentReference(function.Syntax.BodyText));
     public bool RequiresRuntime => ComponentsByName.Count > 0 ||
                                    PrefabsByName.Count > 0 ||
+                                   RequiresProgramArguments ||
                                    FunctionRegistry.AllFunctions.Any(function => function.NeedsWorld ||
                                        function.Parameters.Any(parameter => PrefabsByName.ContainsKey(parameter.Type)) ||
                                        function.Syntax.BodyText.Contains("string", StringComparison.Ordinal) ||
@@ -193,4 +197,9 @@ internal sealed class CompilationModel
                                        function.Syntax.BodyText.Contains("usize ", StringComparison.Ordinal));
     public bool RequiresScheduleBreakSupport => Schedules.Any(schedule => schedule.Steps.OfType<LoopToStepSyntax>().Any()) ||
                                                 FunctionRegistry.AllFunctions.Any(function => function.Syntax.BodyText.Contains("breakloop", StringComparison.Ordinal));
+
+    private static bool ContainsProgramArgumentReference(string text)
+    {
+        return Regex.IsMatch(text, @"\b(argc|argv)\b");
+    }
 }

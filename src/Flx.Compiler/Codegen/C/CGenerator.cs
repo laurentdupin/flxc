@@ -46,6 +46,13 @@ internal sealed class CGenerator
             builder.AppendLine();
         }
 
+        if (model.RequiresProgramArguments)
+        {
+            builder.AppendLine("extern i32 flx_argc;");
+            builder.AppendLine("extern flx_array_string flx_argv;");
+            builder.AppendLine();
+        }
+
         foreach (var global in module.Globals)
             builder.AppendLine($"{CTypeNames.MapType(global.Type, model, module)} {global.Name}{FormatGlobalInitializer(global)};");
 

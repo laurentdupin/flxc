@@ -1,0 +1,9 @@
+i32 argc;
+Array<string> argv;
+
+void Print() {
+}
+
+schedule {
+    run Print;
+}

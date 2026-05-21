@@ -33,6 +33,7 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine();
         builder.AppendLine("flx_string flx_string_empty(void);");
         builder.AppendLine("flx_string flx_string_from_static(const char *data, usize len);");
+        builder.AppendLine("flx_string flx_string_from_cstr_borrowed(const char *value);");
         builder.AppendLine("flx_string flx_string_clone(const flx_string *s);");
         builder.AppendLine("void flx_string_assign(flx_string *dst, const flx_string *src);");
         builder.AppendLine("void flx_string_destroy(flx_string *s);");
@@ -44,6 +45,8 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine("usize flx_array_string_length(const flx_array_string *a);");
         builder.AppendLine("flx_string *flx_array_string_at(flx_array_string *a, usize index);");
         builder.AppendLine("void flx_array_string_destroy(flx_array_string *a);");
+        builder.AppendLine("void flx_array_string_init_from_c_argv(flx_array_string *a, int argc, char **argv);");
+        builder.AppendLine("void flx_array_string_destroy_borrowed(flx_array_string *a);");
         builder.AppendLine();
 
         foreach (var component in model.ComponentsByName.Values.OrderBy(component => component.Name, StringComparer.Ordinal))
@@ -105,6 +108,7 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine();
         builder.AppendLine("#define FLX_STRING_OWNED 1u");
         builder.AppendLine("#define FLX_STRING_STATIC 2u");
+        builder.AppendLine("#define FLX_STRING_BORROWED 4u");
         builder.AppendLine();
         builder.AppendLine("flx_string flx_string_empty(void) {");
         builder.AppendLine("    flx_string s = { (char *)\"\", 0, 0, FLX_STRING_STATIC };");
@@ -113,6 +117,13 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine();
         builder.AppendLine("flx_string flx_string_from_static(const char *data, usize len) {");
         builder.AppendLine("    flx_string s = { (char *)data, len, len, FLX_STRING_STATIC };");
+        builder.AppendLine("    return s;");
+        builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("flx_string flx_string_from_cstr_borrowed(const char *value) {");
+        builder.AppendLine("    if (value == NULL) return flx_string_empty();");
+        builder.AppendLine("    usize len = (usize)strlen(value);");
+        builder.AppendLine("    flx_string s = { (char *)value, len, len, FLX_STRING_BORROWED };");
         builder.AppendLine("    return s;");
         builder.AppendLine("}");
         builder.AppendLine();
@@ -173,6 +184,21 @@ internal sealed class CRuntimeGenerator
         builder.AppendLine();
         builder.AppendLine("void flx_array_string_destroy(flx_array_string *a) {");
         builder.AppendLine("    for (usize i = 0; i < a->count; ++i) flx_string_destroy(&a->items[i]);");
+        builder.AppendLine("    free(a->items);");
+        builder.AppendLine("    flx_array_string_init(a);");
+        builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("void flx_array_string_init_from_c_argv(flx_array_string *a, int argc, char **argv) {");
+        builder.AppendLine("    flx_array_string_init(a);");
+        builder.AppendLine("    if (argc <= 0) return;");
+        builder.AppendLine("    a->items = (flx_string *)malloc((usize)argc * sizeof(flx_string));");
+        builder.AppendLine("    if (a->items == NULL) abort();");
+        builder.AppendLine("    a->count = (usize)argc;");
+        builder.AppendLine("    a->capacity = (usize)argc;");
+        builder.AppendLine("    for (int i = 0; i < argc; ++i) a->items[i] = flx_string_from_cstr_borrowed(argv[i]);");
+        builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("void flx_array_string_destroy_borrowed(flx_array_string *a) {");
         builder.AppendLine("    free(a->items);");
         builder.AppendLine("    flx_array_string_init(a);");
         builder.AppendLine("}");

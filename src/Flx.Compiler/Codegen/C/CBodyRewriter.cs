@@ -7,6 +7,13 @@ namespace Flx.Compiler.Codegen.C;
 
 internal static class CBodyRewriter
 {
+    private static readonly IReadOnlyDictionary<string, string> ProgramArgumentIdentifierRewrites =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["argc"] = "flx_argc",
+            ["argv"] = "flx_argv"
+        };
+
     public static void ValidateAliases(
         string body,
         IReadOnlyDictionary<string, CImportSymbol> importsByAlias,
@@ -15,6 +22,11 @@ internal static class CBodyRewriter
         DiagnosticBag diagnostics)
     {
         Rewrite(body, importsByAlias, source, bodyStart, diagnostics);
+    }
+
+    public static string RewriteProgramArguments(string body)
+    {
+        return RewriteIdentifiers(body, ProgramArgumentIdentifierRewrites);
     }
 
     public static string Rewrite(
@@ -60,6 +72,61 @@ internal static class CBodyRewriter
             {
                 if (TryRewriteIdentifier(body, output, ref position, importsByAlias, source, bodyStart, diagnostics, functionRegistry))
                     continue;
+            }
+
+            output.Append(current);
+            position++;
+        }
+
+        return output.ToString();
+    }
+
+    private static string RewriteIdentifiers(string body, IReadOnlyDictionary<string, string> identifierRewrites)
+    {
+        var output = new StringBuilder(body.Length);
+        var position = 0;
+
+        while (position < body.Length)
+        {
+            var current = body[position];
+
+            if (current == '"')
+            {
+                CopyStringLike(body, output, ref position, '"');
+                continue;
+            }
+
+            if (current == '\'')
+            {
+                CopyStringLike(body, output, ref position, '\'');
+                continue;
+            }
+
+            if (current == '/' && Peek(body, position, 1) == '/')
+            {
+                CopyLineComment(body, output, ref position);
+                continue;
+            }
+
+            if (current == '/' && Peek(body, position, 1) == '*')
+            {
+                CopyBlockComment(body, output, ref position);
+                continue;
+            }
+
+            if (Lexer.IsIdentifierStart(current))
+            {
+                var identifierStart = position;
+                var identifierEnd = ReadIdentifier(body, identifierStart);
+                var identifier = body[identifierStart..identifierEnd];
+
+                output.Append(!IsMemberChainSegment(body, identifierStart) &&
+                              identifierRewrites.TryGetValue(identifier, out var replacement)
+                    ? replacement
+                    : identifier);
+
+                position = identifierEnd;
+                continue;
             }
 
             output.Append(current);

@@ -1,0 +1,30 @@
+{
+  "name": "flx-language",
+  "displayName": "FLX Language Support",
+  "description": "Syntax highlighting and basic editor support for FLX.",
+  "version": "0.0.1",
+  "publisher": "flx",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "flx",
+        "aliases": ["FLX", "flx"],
+        "extensions": [".flx"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "flx",
+        "scopeName": "source.flx",
+        "path": "./syntaxes/flx.tmLanguage.json"
+      }
+    ]
+  }
+}

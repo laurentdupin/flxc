@@ -24,6 +24,9 @@ internal sealed class CBodyLowerer
         var builder = new StringBuilder();
         var scope = new Scope(null);
 
+        scope.Declare("argc", "i32");
+        scope.Declare("argv", "Array<string>");
+
         foreach (var parameter in _function.Parameters)
             scope.Declare(parameter.Name, parameter.Type);
 
@@ -41,6 +44,7 @@ internal sealed class CBodyLowerer
             if (statement.ForHeader is not null)
             {
                 var loweredHeader = LowerExpression(statement.ForHeader, scope);
+                loweredHeader = CBodyRewriter.RewriteProgramArguments(loweredHeader);
                 builder.AppendLine($"{indent}for ({loweredHeader}) {{");
                 LowerStatements(statement.Body ?? "", builder, indent + "    ", scope);
                 builder.AppendLine($"{indent}}}");
@@ -119,7 +123,9 @@ internal sealed class CBodyLowerer
             _function.SourceFile,
             _function.Syntax.BodyStart,
             functionRegistry: _model.FunctionRegistry);
-        builder.AppendLine($"{indent}{LowerExpression(rewritten, scope)}");
+        var lowered = LowerExpression(rewritten, scope);
+        lowered = CBodyRewriter.RewriteProgramArguments(lowered);
+        builder.AppendLine($"{indent}{lowered}");
     }
 
     private string LowerExpression(string expression, Scope scope)

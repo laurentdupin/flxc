@@ -10,6 +10,12 @@ It provides:
 - auto-closing pairs
 - basic indentation rules
 
+The grammar and language configuration are shared with the VS Code extension from:
+
+```text
+tools\grammar\
+```
+
 Build:
 
 ```powershell

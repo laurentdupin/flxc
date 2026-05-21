@@ -31,11 +31,14 @@
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="flx-language-configuration.json">
+    <Content Include="..\..\grammar\flx-language-configuration.json">
+      <Link>flx-language-configuration.json</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Grammars\flx.tmLanguage.json">
+    <Content Include="..\..\grammar\flx.tmLanguage.json">
+      <Link>Grammars\flx.tmLanguage.json</Link>
+      <VSIXSubPath>Grammars</VSIXSubPath>
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

@@ -1,0 +1,13 @@
+import c "stdio.h" as stdio
+
+void PrintArgs() {
+    stdio.printf("argc = %d\n", argc);
+
+    for (usize i = 0; i < argv.length(); ++i) {
+        stdio.printf("%s\n", argv[i].c_str());
+    }
+}
+
+schedule {
+    run PrintArgs;
+}

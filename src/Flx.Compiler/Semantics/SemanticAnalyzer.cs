@@ -7,6 +7,12 @@ namespace Flx.Compiler.Semantics;
 
 internal sealed class SemanticAnalyzer
 {
+    private static readonly HashSet<string> ReservedProgramArgumentSymbols = new(StringComparer.Ordinal)
+    {
+        "argc",
+        "argv"
+    };
+
     private readonly DiagnosticBag _diagnostics;
 
     public SemanticAnalyzer(DiagnosticBag diagnostics)
@@ -48,6 +54,9 @@ internal sealed class SemanticAnalyzer
     {
         foreach (var component in module.Syntax.Components)
         {
+            if (CheckReservedProgramArgumentSymbol(component.Name, component.NameLocation))
+                continue;
+
             if (model.ComponentsByName.ContainsKey(component.Name))
             {
                 _diagnostics.Report("FLX0302", $"duplicate component '{component.Name}'.", component.NameLocation);
@@ -92,6 +101,9 @@ internal sealed class SemanticAnalyzer
     {
         foreach (var prefab in module.Syntax.Prefabs)
         {
+            if (CheckReservedProgramArgumentSymbol(prefab.Name, prefab.NameLocation))
+                continue;
+
             if (model.PrefabsByName.ContainsKey(prefab.Name))
             {
                 _diagnostics.Report("FLX0305", $"duplicate prefab '{prefab.Name}'.", prefab.NameLocation);
@@ -138,6 +150,9 @@ internal sealed class SemanticAnalyzer
     {
         foreach (var import in unit.CImports)
         {
+            if (CheckReservedProgramArgumentSymbol(import.Alias, import.Location))
+                continue;
+
             if (module.CImportsByAlias.ContainsKey(import.Alias))
             {
                 _diagnostics.Report("FLX0201", $"duplicate C import alias '{import.Alias}'.", import.Location);
@@ -154,6 +169,9 @@ internal sealed class SemanticAnalyzer
     {
         foreach (var function in unit.Functions)
         {
+            if (CheckReservedProgramArgumentSymbol(function.Name, function.NameLocation))
+                continue;
+
             if (function.Name == "main")
                 _diagnostics.Report("FLX0102", "function name 'main' is reserved when using schedule-generated main.", function.NameLocation);
 
@@ -164,7 +182,10 @@ internal sealed class SemanticAnalyzer
                 .ToArray();
 
             foreach (var parameter in parameters)
+            {
+                CheckReservedProgramArgumentSymbol(parameter.Name, parameter.Location);
                 CheckTypeAlias(parameter.Type, module, parameter.Location);
+            }
 
             if (registry.ContainsExactSignature(function.Name, parameters))
                 _diagnostics.Report("FLX0103", $"duplicate function signature '{FormatSignature(function.Name, parameters)}'.", function.NameLocation);
@@ -184,6 +205,9 @@ internal sealed class SemanticAnalyzer
     {
         foreach (var global in unit.Globals)
         {
+            if (CheckReservedProgramArgumentSymbol(global.Name, global.NameLocation))
+                continue;
+
             CheckTypeAlias(global.Type, module, global.DeclarationLocation);
 
             if (model.GlobalsByName.ContainsKey(global.Name))
@@ -207,6 +231,15 @@ internal sealed class SemanticAnalyzer
         var alias = typeName[..dotIndex];
         if (!module.CImportsByAlias.ContainsKey(alias))
             _diagnostics.Report("FLX0200", $"unknown C import alias '{alias}'.", location);
+    }
+
+    private bool CheckReservedProgramArgumentSymbol(string name, SourceLocation location)
+    {
+        if (!ReservedProgramArgumentSymbols.Contains(name))
+            return false;
+
+        _diagnostics.Report("FLX0301", $"'{name}' is a reserved program argument symbol.", location);
+        return true;
     }
 
     private void CheckSchedules(CompilationModel model, bool requireSchedule, bool validateScheduleTargets)

@@ -28,6 +28,9 @@ internal static class CTypeNames
         if (sourceType == "string")
             return "flx_string";
 
+        if (sourceType == "Array<string>")
+            return "flx_array_string";
+
         if (sourceType == "i32")
             return "int";
 

@@ -229,12 +229,31 @@ internal sealed class Parser
                 return $"{first}.{second.Text}";
             }
 
+            if (Current.Kind == TokenKind.Unknown && Current.Text == "<")
+            {
+                Advance();
+                var argument = ParseTypeName("expected generic type argument.");
+                ExpectUnknown(">", "expected '>' after generic type argument.");
+                return $"{first}<{argument}>";
+            }
+
             return first;
         }
 
         _diagnostics.Report("FLX0008", message, Current.Location);
         Advance();
         return "void";
+    }
+
+    private void ExpectUnknown(string text, string message)
+    {
+        if (Current.Kind == TokenKind.Unknown && Current.Text == text)
+        {
+            Advance();
+            return;
+        }
+
+        _diagnostics.Report("FLX0011", message, Current.Location);
     }
 
     private Token ExpectIdentifier(string message)

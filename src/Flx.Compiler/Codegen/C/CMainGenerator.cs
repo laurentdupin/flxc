@@ -33,9 +33,24 @@ internal sealed class CMainGenerator
             builder.AppendLine();
         }
 
-        builder.AppendLine("int main(int argc, char **argv) {");
-        builder.AppendLine("    (void)argc;");
-        builder.AppendLine("    (void)argv;");
+        if (model.RequiresProgramArguments)
+        {
+            builder.AppendLine("i32 flx_argc = 0;");
+            builder.AppendLine("flx_array_string flx_argv;");
+            builder.AppendLine();
+        }
+
+        builder.AppendLine("int main(int c_argc, char **c_argv) {");
+        if (model.RequiresProgramArguments)
+        {
+            builder.AppendLine("    flx_argc = (i32)c_argc;");
+            builder.AppendLine("    flx_array_string_init_from_c_argv(&flx_argv, c_argc, c_argv);");
+        }
+        else
+        {
+            builder.AppendLine("    (void)c_argc;");
+            builder.AppendLine("    (void)c_argv;");
+        }
         builder.AppendLine();
 
         if (model.RequiresRuntime)
@@ -52,6 +67,12 @@ internal sealed class CMainGenerator
         {
             builder.AppendLine();
             builder.AppendLine("    flx_world_destroy(&world);");
+        }
+
+        if (model.RequiresProgramArguments)
+        {
+            builder.AppendLine();
+            builder.AppendLine("    flx_array_string_destroy_borrowed(&flx_argv);");
         }
 
         builder.AppendLine();

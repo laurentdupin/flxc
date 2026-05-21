@@ -46,3 +46,9 @@ For basic `.flx` syntax coloring and editor behavior, build and install the VSIX
 ```text
 ..\..\tools\visualstudio\Flx.VisualStudio
 ```
+
+For VS Code syntax coloring, open or install the extension folder at:
+
+```text
+..\..\tools\vscode\flx
+```

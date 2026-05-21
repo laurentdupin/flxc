@@ -7,6 +7,7 @@
     { "include": "#comments" },
     { "include": "#preprocessor" },
     { "include": "#strings" },
+    { "include": "#builtins" },
     { "include": "#keywords" },
     { "include": "#types" },
     { "include": "#numbers" },
@@ -57,6 +58,14 @@
               "match": "\\\\."
             }
           ]
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "variable.language.flx",
+          "match": "\\b(argc|argv)\\b"
         }
       ]
     },
