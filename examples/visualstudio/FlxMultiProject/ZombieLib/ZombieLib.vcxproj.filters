@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Package Files">
+      <UniqueIdentifier>{9C3B6B37-2E79-46B4-BCC8-A14B0B01A219}</UniqueIdentifier>
+      <Extensions>json</Extensions>
+    </Filter>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{9759887F-3540-4C0C-AB77-35CFA1C4C426}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxPackage Include="flx.package.json">
+      <Filter>FLX Package Files</Filter>
+    </FlxPackage>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="src\Zombie.flx">
+      <Filter>FLX Source Files</Filter>
+    </None>
+    <None Include="src\ZombieGreeting.flx">
+      <Filter>FLX Source Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>

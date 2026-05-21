@@ -219,6 +219,9 @@ PublishScripts/
 *.nuget.props
 *.nuget.targets
 
+# Visual Studio FLX example build artifacts
+examples/visualstudio/**/flx/
+
 # Microsoft Azure Build Output
 csx/
 *.build.csdef

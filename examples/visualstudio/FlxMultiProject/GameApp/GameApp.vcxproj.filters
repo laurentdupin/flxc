@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Package Files">
+      <UniqueIdentifier>{2457C404-7EAB-4D36-8D75-273FE665A66F}</UniqueIdentifier>
+      <Extensions>json</Extensions>
+    </Filter>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{93A2247C-705D-45D0-A0DF-0D38252B0951}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxPackage Include="flx.package.json">
+      <Filter>FLX Package Files</Filter>
+    </FlxPackage>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="src\Main.flx">
+      <Filter>FLX Source Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>

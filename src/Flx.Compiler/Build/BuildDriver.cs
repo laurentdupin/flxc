@@ -69,6 +69,7 @@ internal sealed class BuildDriver
 
         var units = ParseSources(sourceFiles, diagnostics);
         var requireSchedule = !options.CompileOnly &&
+                              !options.BuildLibrary &&
                               !options.NoMain &&
                               packageGraph?.RootPackage.IsLibrary != true;
         var validateScheduleTargets = !options.CompileOnly;
@@ -80,7 +81,8 @@ internal sealed class BuildDriver
             return 1;
         }
 
-        var model = new SemanticAnalyzer(diagnostics).Analyze(units, requireSchedule, validateScheduleTargets);
+        var externalPackages = packageGraph?.BinaryPackages.Select(package => package.Metadata).ToArray() ?? [];
+        var model = new SemanticAnalyzer(diagnostics).Analyze(units, requireSchedule, validateScheduleTargets, externalPackages);
 
         if (diagnostics.HasErrors)
         {
@@ -88,7 +90,7 @@ internal sealed class BuildDriver
             return 1;
         }
 
-        var generation = await GenerateAsync(model, options, outputDirectory, shouldDeleteDirectory);
+        var generation = await GenerateAsync(model, options, packageGraph, outputDirectory, shouldDeleteDirectory);
 
         if (options.EmitC)
             return 0;
@@ -138,7 +140,11 @@ internal sealed class BuildDriver
             return null;
 
         var packageGraph = new PackageLoader().Load(options.PackagePath, diagnostics);
+        if (options.BuildLibrary && packageGraph?.RootPackage.IsLibrary == false)
+            diagnostics.Report("FLX0509", $"--build-library requires a library package, but '{packageGraph.RootPackage.Name}' is '{packageGraph.RootPackage.Type}'.");
+
         if (packageGraph?.RootPackage.IsLibrary == true &&
+            !options.BuildLibrary &&
             !options.EmitC &&
             !options.EmitPreprocessed &&
             !options.CompileOnly)
@@ -180,6 +186,12 @@ internal sealed class BuildDriver
             AddDistinct(options.IncludeDirs, package.CIncludeDirs, StringComparer.OrdinalIgnoreCase);
             AddDistinct(options.Libraries, package.CLibraries, StringComparer.Ordinal);
             AddDistinct(options.Defines, package.Defines, StringComparer.Ordinal);
+        }
+
+        foreach (var package in packageGraph.BinaryPackages)
+        {
+            AddDistinct(options.IncludeDirs, package.IncludeDirs, StringComparer.OrdinalIgnoreCase);
+            AddDistinct(options.Libraries, package.Libraries, StringComparer.OrdinalIgnoreCase);
         }
     }
 
@@ -257,6 +269,7 @@ internal sealed class BuildDriver
     private static async Task<GenerationResult> GenerateAsync(
         CompilationModel model,
         CommandLineOptions options,
+        PackageGraph? packageGraph,
         string outputDirectory,
         bool shouldDeleteDirectory)
     {
@@ -317,7 +330,74 @@ internal sealed class BuildDriver
         if (!string.IsNullOrWhiteSpace(options.GeneratedListPath))
             await WriteGeneratedListAsync(options.GeneratedListPath, generatedSources);
 
+        if (options.BuildLibrary && packageGraph is not null)
+            await EmitLibraryPackageArtifactsAsync(packageGraph.RootPackage, model, moduleHeaders, outputDirectory, options);
+
         return new GenerationResult(outputDirectory, shouldDeleteDirectory, generatedSources, mainSource);
+    }
+
+    private static async Task EmitLibraryPackageArtifactsAsync(
+        LoadedPackage package,
+        CompilationModel model,
+        IReadOnlyList<ModuleHeader> moduleHeaders,
+        string outputDirectory,
+        CommandLineOptions options)
+    {
+        var publicIncludeDir = Path.GetFullPath(options.PublicIncludeDir ?? Path.Combine(outputDirectory, "include"));
+        Directory.CreateDirectory(publicIncludeDir);
+
+        var publicHeaders = new List<string>();
+
+        var runtimeHeaderPath = Path.Combine(outputDirectory, "flx_runtime.g.h");
+        if (File.Exists(runtimeHeaderPath))
+            File.Copy(runtimeHeaderPath, Path.Combine(publicIncludeDir, "flx_runtime.g.h"), overwrite: true);
+
+        var rootModuleHeaders = moduleHeaders
+            .Where(header => string.Equals(header.Module.SourceFile.PackageName, package.Name, StringComparison.Ordinal))
+            .OrderBy(header => header.HeaderFileName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var header in rootModuleHeaders)
+        {
+            var source = Path.Combine(outputDirectory, header.HeaderFileName);
+            var destination = Path.Combine(publicIncludeDir, header.HeaderFileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination, overwrite: true);
+        }
+
+        var packageHeaderName = "flx_" + CTypeNames.SafeIdentifier(package.Name) + ".g.h";
+        await File.WriteAllTextAsync(
+            Path.Combine(publicIncludeDir, packageHeaderName),
+            GeneratePackageHeader(package, rootModuleHeaders, model.RequiresRuntime));
+        publicHeaders.Add(packageHeaderName);
+
+        var metadataPath = Path.GetFullPath(options.MetadataOutputPath ?? Path.Combine(outputDirectory, package.Name + ".flxmeta.json"));
+        await PackageMetadataWriter.WriteAsync(package, model, publicHeaders, metadataPath);
+    }
+
+    private static string GeneratePackageHeader(LoadedPackage package, IReadOnlyList<ModuleHeader> rootModuleHeaders, bool includeRuntime)
+    {
+        var builder = new System.Text.StringBuilder();
+        var guard = "FLX_" + CTypeNames.SafeIdentifier(package.Name).ToUpperInvariant() + "_G_H";
+
+        builder.AppendLine("/* Generated by flxc. Do not edit. */");
+        builder.AppendLine($"/* Package: {package.Name} */");
+        builder.AppendLine();
+        builder.AppendLine($"#ifndef {guard}");
+        builder.AppendLine($"#define {guard}");
+        builder.AppendLine();
+        if (includeRuntime)
+        {
+            builder.AppendLine("#include \"flx_runtime.g.h\"");
+            builder.AppendLine();
+        }
+
+        foreach (var header in rootModuleHeaders)
+            builder.AppendLine($"#include \"{header.HeaderFileName.Replace("\\", "/", StringComparison.Ordinal)}\"");
+
+        builder.AppendLine();
+        builder.AppendLine($"#endif /* {guard} */");
+        return builder.ToString();
     }
 
     private static async Task WriteGeneratedListAsync(string generatedListPath, IReadOnlyList<string> generatedSources)

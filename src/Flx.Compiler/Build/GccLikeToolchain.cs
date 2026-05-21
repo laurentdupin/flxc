@@ -49,8 +49,17 @@ internal sealed class GccLikeToolchain : ICToolchain
         foreach (var libraryDir in options.LibraryDirs)
             yield return "-L" + libraryDir;
         foreach (var library in options.Libraries)
-            yield return "-l" + library;
+            yield return IsDirectLibraryPath(library) ? library : "-l" + library;
         foreach (var flag in options.LdFlags)
             yield return flag;
+    }
+
+    private static bool IsDirectLibraryPath(string library)
+    {
+        return Path.IsPathRooted(library) ||
+               library.Contains(Path.DirectorySeparatorChar) ||
+               library.Contains(Path.AltDirectorySeparatorChar) ||
+               library.EndsWith(".a", StringComparison.OrdinalIgnoreCase) ||
+               library.EndsWith(".lib", StringComparison.OrdinalIgnoreCase);
     }
 }

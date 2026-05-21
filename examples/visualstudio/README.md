@@ -12,6 +12,7 @@ Then open one of the solutions:
 FlxHello\FlxHello.sln
 FlxCrossFile\FlxCrossFile.sln
 FlxPackageZombie\FlxPackageZombie.sln
+FlxMultiProject\FlxMultiProject.sln
 FlxWindow\FlxWindow.sln
 ```
 
@@ -37,6 +38,8 @@ Generated C remains under `$(IntDir)\flx` and is not shown as user source in Sol
 `FlxCrossFile` builds a console executable from two `.flx` files. `Main.flx` calls a function defined in `Greeting.flx`, which exercises generated module headers and cross-file FLX symbol visibility.
 
 `FlxPackageZombie` builds a console executable from a `flx.package.json` manifest. The app package depends on a source library package under `libs\ZombieLib`, which exercises package-mode dependency loading through MSBuild.
+
+`FlxMultiProject` builds a static FLX library project first, then builds an executable project that consumes the library's `.flxmeta.json`, public generated headers, and `ZombieLib.lib`.
 
 `FlxWindow` builds a native Win32 window executable and links:
 

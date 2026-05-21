@@ -1,0 +1,9 @@
+module zombies;
+
+component ZombieData {
+    string name = "";
+}
+
+prefab Zombie {
+    flatten ZombieData;
+}

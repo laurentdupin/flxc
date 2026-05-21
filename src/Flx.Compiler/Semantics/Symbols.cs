@@ -110,7 +110,8 @@ internal sealed class FunctionSymbol
         string mangledName,
         string returnType,
         IReadOnlyList<ParameterSymbol> parameters,
-        SourceLocation location)
+        SourceLocation location,
+        bool isExternal = false)
     {
         Module = module;
         SourceFile = sourceFile;
@@ -121,6 +122,7 @@ internal sealed class FunctionSymbol
         ReturnType = returnType;
         Parameters = parameters;
         Location = location;
+        IsExternal = isExternal;
     }
 
     public ModuleSymbol Module { get; }
@@ -133,7 +135,8 @@ internal sealed class FunctionSymbol
     public IReadOnlyList<ParameterSymbol> Parameters { get; }
     public SourceLocation Location { get; }
     public string? ReceiverType { get; set; }
-    public bool NeedsWorld => Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
+    public bool IsExternal { get; }
+    public bool NeedsWorld => !IsExternal && Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
 }
 
 internal sealed class GlobalVariableSymbol
@@ -201,6 +204,7 @@ internal sealed class CompilationModel
     public Dictionary<string, PrefabSymbol> PrefabsByFullName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, List<PrefabSymbol>> PrefabsByShortName { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
+    public List<string> ExternalHeaders { get; } = [];
     public ScheduleDeclSyntax? Schedule => Schedules.Count == 1 ? Schedules[0] : null;
     public ModuleSymbol? ScheduleModule => Schedule is null
         ? null

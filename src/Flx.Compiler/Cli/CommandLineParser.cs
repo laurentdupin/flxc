@@ -73,6 +73,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (arg == "--build-library")
+            {
+                options.BuildLibrary = true;
+                continue;
+            }
+
             if (arg == "--verbose")
             {
                 options.Verbose = true;
@@ -106,6 +112,18 @@ internal static class CommandLineParser
             if (TryReadLongOptionValue(args, ref i, arg, "--obj-dir", diagnostics, out var objDir))
             {
                 options.ObjDir = objDir;
+                continue;
+            }
+
+            if (TryReadLongOptionValue(args, ref i, arg, "--metadata-out", diagnostics, out var metadataOut))
+            {
+                options.MetadataOutputPath = metadataOut;
+                continue;
+            }
+
+            if (TryReadLongOptionValue(args, ref i, arg, "--public-include-dir", diagnostics, out var publicIncludeDir))
+            {
+                options.PublicIncludeDir = publicIncludeDir;
                 continue;
             }
 
@@ -201,6 +219,9 @@ internal static class CommandLineParser
 
         if (!string.IsNullOrWhiteSpace(options.PackagePath) && options.InputFiles.Count > 0)
             diagnostics.Report("FLX9007", "--package cannot be combined with positional .flx input files.");
+
+        if (options.BuildLibrary && string.IsNullOrWhiteSpace(options.PackagePath))
+            diagnostics.Report("FLX9008", "--build-library requires --package.");
 
         if (options.CompileOnly && options.InputFiles.Count > 1 && options.OutputPath is not null)
             diagnostics.Report("FLX9003", "-c with multiple input files cannot use a single -o output path.");

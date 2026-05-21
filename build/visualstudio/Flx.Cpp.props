@@ -8,6 +8,7 @@
 
     <FlxGeneratedDir Condition="'$(FlxGeneratedDir)' == ''">$(IntDir)flx</FlxGeneratedDir>
     <FlxGeneratedList Condition="'$(FlxGeneratedList)' == ''">$(FlxGeneratedDir)\generated_c_files.txt</FlxGeneratedList>
+    <FlxPackageOutputDir Condition="'$(FlxPackageOutputDir)' == ''">$(OutDir)flx</FlxPackageOutputDir>
 
     <FlxCCompiler Condition="'$(FlxCCompiler)' == ''">cl</FlxCCompiler>
     <FlxCCompilerMode Condition="'$(FlxCCompilerMode)' == ''">msvc</FlxCCompilerMode>

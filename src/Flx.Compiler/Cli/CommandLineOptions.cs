@@ -11,11 +11,14 @@ internal sealed class CommandLineOptions
     public bool KeepC { get; set; }
     public bool KeepPreprocessed { get; set; }
     public bool NoPreprocess { get; set; }
+    public bool BuildLibrary { get; set; }
     public bool Verbose { get; set; }
     public bool NoMain { get; set; }
     public bool ShowHelp { get; set; }
     public bool ShowVersion { get; set; }
     public string? ObjDir { get; set; }
+    public string? MetadataOutputPath { get; set; }
+    public string? PublicIncludeDir { get; set; }
     public string? GeneratedListPath { get; set; }
     public string? DiagnosticsFormat { get; set; }
     public string? CCompiler { get; set; }
@@ -46,7 +49,12 @@ internal sealed class CommandLineOptions
           --keep-c            Keep generated C files after native build
           --keep-pp           Keep preprocessed FLX files after native build
           --no-preprocess     Disable FLX preprocessing
+          --build-library     Build a library package: no generated main, emit package metadata/public headers
           --obj-dir <dir>     Intermediate/generated file directory
+          --metadata-out <path>
+                              Package metadata output path for --build-library
+          --public-include-dir <dir>
+                              Public generated header directory for --build-library
           --generated-list <path>
                               Write generated C paths, one per line
           --diagnostics-format <fmt>

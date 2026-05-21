@@ -50,6 +50,33 @@ Or use package mode:
 
 For now, a project may use either `FlxPackage` or `FlxCompile`, not both. Package mode supports one package manifest item per C++ project.
 
+Static-library package projects are supported by setting the normal C++ project type:
+
+```xml
+<PropertyGroup Label="Configuration">
+  <ConfigurationType>StaticLibrary</ConfigurationType>
+</PropertyGroup>
+```
+
+In that mode the target passes `--build-library`, suppresses generated `main`, and writes package metadata/public headers to:
+
+```text
+$(FlxPackageMetadata)
+$(FlxPublicIncludeDir)
+```
+
+An executable project can consume an already-built FLX library with a package manifest binary dependency plus an explicit MSBuild item for the generated include directory:
+
+```xml
+<ItemGroup>
+  <FlxBinaryPackageReference Include="ZombieLib">
+    <IncludeDir>..\flx\ZombieLib\include</IncludeDir>
+  </FlxBinaryPackageReference>
+</ItemGroup>
+```
+
+The `FlxBinaryPackageReference` include directory is attached to generated C compilation. Link the `.lib` through a normal C++ `ProjectReference` when the library is in the same solution, or through standard C++ linker settings when it is external.
+
 Useful project properties:
 
 ```xml

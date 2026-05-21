@@ -22,6 +22,12 @@ internal sealed class CUmbrellaHeaderGenerator
             builder.AppendLine();
         }
 
+        foreach (var header in model.ExternalHeaders.Order(StringComparer.OrdinalIgnoreCase))
+            builder.AppendLine($"#include \"{header.Replace("\\", "/", StringComparison.Ordinal)}\"");
+
+        if (model.ExternalHeaders.Count > 0)
+            builder.AppendLine();
+
         foreach (var header in moduleHeaders.Select(header => header.HeaderFileName).Order(StringComparer.OrdinalIgnoreCase))
             builder.AppendLine($"#include \"{header.Replace("\\", "/", StringComparison.Ordinal)}\"");
 

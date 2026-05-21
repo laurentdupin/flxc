@@ -1,6 +1,7 @@
 using Flx.Compiler.Codegen.C;
 using Flx.Compiler.Diagnostics;
 using Flx.Compiler.Frontend;
+using Flx.Compiler.Metadata;
 using System.Text.RegularExpressions;
 
 namespace Flx.Compiler.Semantics;
@@ -20,7 +21,11 @@ internal sealed class SemanticAnalyzer
         _diagnostics = diagnostics;
     }
 
-    public CompilationModel Analyze(IReadOnlyList<CompilationUnitSyntax> units, bool requireSchedule, bool validateScheduleTargets)
+    public CompilationModel Analyze(
+        IReadOnlyList<CompilationUnitSyntax> units,
+        bool requireSchedule,
+        bool validateScheduleTargets,
+        IReadOnlyList<PackageMetadata>? externalPackages = null)
     {
         var model = new CompilationModel();
 
@@ -32,14 +37,20 @@ internal sealed class SemanticAnalyzer
             model.Schedules.AddRange(unit.Schedules);
         }
 
+        BindExternalComponents(model, externalPackages ?? []);
+
         foreach (var module in model.Modules)
             BindComponents(module, model);
+
+        BindExternalPrefabs(model, externalPackages ?? []);
 
         foreach (var module in model.Modules)
             BindPrefabs(module, model);
 
         foreach (var module in model.Modules)
             BindGlobals(module.Syntax, module, model);
+
+        BindExternalFunctions(model, externalPackages ?? [], model.FunctionRegistry);
 
         foreach (var module in model.Modules)
             BindFunctions(module.Syntax, module, model, model.FunctionRegistry);
@@ -70,6 +81,39 @@ internal sealed class SemanticAnalyzer
             module.Components.Add(symbol);
             model.ComponentsByFullName.Add(symbol.FullName, symbol);
             AddByShortName(model.ComponentsByShortName, symbol.Name, symbol);
+        }
+    }
+
+    private void BindExternalComponents(CompilationModel model, IReadOnlyList<PackageMetadata> externalPackages)
+    {
+        foreach (var package in externalPackages)
+        {
+            foreach (var header in package.Headers)
+            {
+                if (!string.IsNullOrWhiteSpace(header) && !model.ExternalHeaders.Contains(header, StringComparer.Ordinal))
+                    model.ExternalHeaders.Add(header);
+            }
+
+            foreach (var component in package.Symbols.Components)
+            {
+                if (model.ComponentsByFullName.ContainsKey(component.FullName))
+                {
+                    _diagnostics.Report("FLX0302", $"duplicate component '{component.FullName}'.", ExternalLocation(package));
+                    continue;
+                }
+
+                var sourceFile = ExternalSourceFile(package);
+                var syntax = new ComponentDeclSyntax(component.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package));
+                var fields = component.Fields.Select(field => new ComponentFieldSymbol(
+                    field.Type,
+                    field.Name,
+                    field.DefaultValue,
+                    ExternalLocation(package))).ToArray();
+                var symbol = new ComponentSymbol(sourceFile, syntax, component.Name, component.FullName, fields);
+
+                model.ComponentsByFullName.Add(symbol.FullName, symbol);
+                AddByShortName(model.ComponentsByShortName, symbol.Name, symbol);
+            }
         }
     }
 
@@ -155,6 +199,44 @@ internal sealed class SemanticAnalyzer
         }
     }
 
+    private void BindExternalPrefabs(CompilationModel model, IReadOnlyList<PackageMetadata> externalPackages)
+    {
+        foreach (var package in externalPackages)
+        {
+            foreach (var prefab in package.Symbols.Prefabs)
+            {
+                if (model.PrefabsByFullName.ContainsKey(prefab.FullName))
+                {
+                    _diagnostics.Report("FLX0305", $"duplicate prefab '{prefab.FullName}'.", ExternalLocation(package));
+                    continue;
+                }
+
+                var flattened = new List<ComponentSymbol>();
+                foreach (var componentName in prefab.FlattenedComponents)
+                {
+                    if (model.ComponentsByFullName.TryGetValue(componentName, out var component))
+                    {
+                        flattened.Add(component);
+                    }
+                    else
+                    {
+                        _diagnostics.Report(
+                            "FLX0306",
+                            $"binary package prefab '{prefab.FullName}' references missing component '{componentName}'.",
+                            ExternalLocation(package));
+                    }
+                }
+
+                var sourceFile = ExternalSourceFile(package);
+                var syntax = new PrefabDeclSyntax(prefab.Name, "{}", 0, ExternalLocation(package), ExternalLocation(package));
+                var symbol = new PrefabSymbol(sourceFile, syntax, prefab.Name, prefab.FullName, flattened);
+
+                model.PrefabsByFullName.Add(symbol.FullName, symbol);
+                AddByShortName(model.PrefabsByShortName, symbol.Name, symbol);
+            }
+        }
+    }
+
     private void BindImports(CompilationUnitSyntax unit, ModuleSymbol module)
     {
         foreach (var import in unit.CImports)
@@ -205,6 +287,58 @@ internal sealed class SemanticAnalyzer
 
             module.Functions.Add(symbol);
             registry.TryAdd(symbol);
+        }
+    }
+
+    private void BindExternalFunctions(
+        CompilationModel model,
+        IReadOnlyList<PackageMetadata> externalPackages,
+        FunctionRegistry registry)
+    {
+        foreach (var package in externalPackages)
+        {
+            foreach (var function in package.Symbols.Functions)
+            {
+                var moduleName = ModuleNameFromFullName(function.FullName, function.SourceName);
+                var sourceFile = ExternalSourceFile(package);
+                var unit = new CompilationUnitSyntax(sourceFile)
+                {
+                    Module = string.IsNullOrWhiteSpace(moduleName)
+                        ? null
+                        : new ModuleDeclSyntax(moduleName, ExternalLocation(package))
+                };
+                var module = new ModuleSymbol(sourceFile, unit);
+                var syntax = new FunctionDeclSyntax(
+                    function.ReturnType,
+                    function.SourceName,
+                    function.Parameters.Select(parameter => new ParameterSyntax(parameter.Type, parameter.Name, ExternalLocation(package))).ToArray(),
+                    "{}",
+                    0,
+                    ExternalLocation(package),
+                    ExternalLocation(package));
+                var parameters = function.Parameters.Select(parameter =>
+                    new ParameterSymbol(parameter.Type, parameter.Name, ExternalLocation(package))).ToArray();
+
+                if (registry.ContainsExactSignature(function.FullName, parameters))
+                    _diagnostics.Report("FLX0103", $"duplicate function signature '{FormatSignature(function.FullName, parameters)}'.", ExternalLocation(package));
+
+                var symbol = new FunctionSymbol(
+                    module,
+                    sourceFile,
+                    syntax,
+                    function.SourceName,
+                    function.FullName,
+                    function.MangledName,
+                    function.ReturnType,
+                    parameters,
+                    ExternalLocation(package),
+                    isExternal: true)
+                {
+                    ReceiverType = function.ReceiverType
+                };
+
+                registry.TryAdd(symbol);
+            }
         }
     }
 
@@ -403,6 +537,26 @@ internal sealed class SemanticAnalyzer
             return $"{name}()";
 
         return $"{name}({string.Join(", ", parameters.Select(parameter => parameter.Type))})";
+    }
+
+    private static SourceFile ExternalSourceFile(PackageMetadata package)
+    {
+        var path = $"binary package {package.Name}";
+        return new SourceFile(path, "", packageName: package.Name);
+    }
+
+    private static SourceLocation ExternalLocation(PackageMetadata package)
+    {
+        return new SourceLocation($"binary package {package.Name}", 1, 1, 0);
+    }
+
+    private static string ModuleNameFromFullName(string fullName, string sourceName)
+    {
+        var suffix = "." + sourceName;
+        if (fullName.EndsWith(suffix, StringComparison.Ordinal))
+            return fullName[..^suffix.Length];
+
+        return "";
     }
 
     private static string StripOuterBlock(string text)

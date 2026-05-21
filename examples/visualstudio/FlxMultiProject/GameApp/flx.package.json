@@ -1,0 +1,22 @@
+{
+  "name": "GameApp",
+  "type": "exe",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [
+    {
+      "name": "ZombieLib",
+      "metadata": "../flx/ZombieLib/ZombieLib.flxmeta.json",
+      "includeDirs": [
+        "../flx/ZombieLib/include"
+      ],
+      "libraries": [
+        "../x64/Debug/ZombieLib.lib"
+      ]
+    }
+  ],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

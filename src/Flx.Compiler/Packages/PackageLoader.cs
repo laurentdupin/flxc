@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Flx.Compiler.Diagnostics;
+using Flx.Compiler.Metadata;
 
 namespace Flx.Compiler.Packages;
 
@@ -17,7 +18,10 @@ internal sealed class PackageLoader
     private readonly Dictionary<string, LoadedPackage> _packagesByPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LoadedPackage> _packagesByName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _manifestNamesByPath = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, LoadedBinaryPackage> _binaryPackagesByMetadataPath = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, LoadedBinaryPackage> _binaryPackagesByName = new(StringComparer.Ordinal);
     private readonly List<LoadedPackage> _orderedPackages = [];
+    private readonly List<LoadedBinaryPackage> _binaryPackages = [];
     private readonly Stack<string> _loadStack = new();
 
     public PackageGraph? Load(string manifestPath, DiagnosticBag diagnostics)
@@ -25,7 +29,7 @@ internal sealed class PackageLoader
         var root = LoadRecursive(Path.GetFullPath(manifestPath), diagnostics);
         return diagnostics.HasErrors || root is null
             ? null
-            : new PackageGraph(root, _orderedPackages);
+            : new PackageGraph(root, _orderedPackages, _binaryPackages);
     }
 
     private LoadedPackage? LoadRecursive(string manifestPath, DiagnosticBag diagnostics)
@@ -64,16 +68,31 @@ internal sealed class PackageLoader
         var dependencies = new List<LoadedPackage>();
         foreach (var dependency in manifest.Dependencies)
         {
-            if (string.IsNullOrWhiteSpace(dependency.Path))
+            var hasSourcePath = !string.IsNullOrWhiteSpace(dependency.Path);
+            var hasMetadataPath = !string.IsNullOrWhiteSpace(dependency.Metadata);
+
+            if (hasSourcePath && hasMetadataPath)
             {
-                diagnostics.Report("FLX0502", $"dependency package path is missing in '{manifestPath}'.");
+                diagnostics.Report("FLX0500", $"dependency '{dependency.Name}' in '{manifestPath}' cannot specify both 'path' and 'metadata'.");
                 continue;
             }
 
-            var dependencyPath = Path.GetFullPath(Path.Combine(rootDirectory, dependency.Path));
-            var loadedDependency = LoadRecursive(dependencyPath, diagnostics);
-            if (loadedDependency is not null)
-                dependencies.Add(loadedDependency);
+            if (!hasSourcePath && !hasMetadataPath)
+            {
+                diagnostics.Report("FLX0502", $"dependency package path or metadata is missing in '{manifestPath}'.");
+                continue;
+            }
+
+            if (hasSourcePath)
+            {
+                var dependencyPath = Path.GetFullPath(Path.Combine(rootDirectory, dependency.Path));
+                var loadedDependency = LoadRecursive(dependencyPath, diagnostics);
+                if (loadedDependency is not null)
+                    dependencies.Add(loadedDependency);
+                continue;
+            }
+
+            LoadBinaryDependency(dependency, rootDirectory, manifestPath, diagnostics);
         }
 
         var sources = ExpandSources(manifest.Sources, rootDirectory, manifestPath, diagnostics);
@@ -94,8 +113,9 @@ internal sealed class PackageLoader
             manifest.CLibraries.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
             manifest.Defines.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
 
-        if (_packagesByName.TryGetValue(package.Name, out var existingName) &&
-            !existingName.ManifestPath.Equals(package.ManifestPath, StringComparison.OrdinalIgnoreCase))
+        if ((_packagesByName.TryGetValue(package.Name, out var existingName) &&
+             !existingName.ManifestPath.Equals(package.ManifestPath, StringComparison.OrdinalIgnoreCase)) ||
+            _binaryPackagesByName.ContainsKey(package.Name))
         {
             diagnostics.Report("FLX0506", $"duplicate package name '{package.Name}'.");
         }
@@ -107,6 +127,66 @@ internal sealed class PackageLoader
         _orderedPackages.Add(package);
         _loadStack.Pop();
         return package;
+    }
+
+    private LoadedBinaryPackage? LoadBinaryDependency(
+        PackageDependencyManifest dependency,
+        string rootDirectory,
+        string manifestPath,
+        DiagnosticBag diagnostics)
+    {
+        var metadataPath = Path.GetFullPath(Path.Combine(rootDirectory, dependency.Metadata));
+        if (_binaryPackagesByMetadataPath.TryGetValue(metadataPath, out var existing))
+            return existing;
+
+        if (!File.Exists(metadataPath))
+        {
+            diagnostics.Report("FLX0508", $"binary package metadata not found: {metadataPath}");
+            return null;
+        }
+
+        var metadata = PackageMetadataReader.Read(metadataPath, out var error);
+        if (metadata is null)
+        {
+            diagnostics.Report("FLX0508", $"failed to read binary package metadata '{metadataPath}': {error}");
+            return null;
+        }
+
+        var declaredName = string.IsNullOrWhiteSpace(dependency.Name) ? metadata.Name : dependency.Name;
+        if (!string.Equals(declaredName, metadata.Name, StringComparison.Ordinal))
+        {
+            diagnostics.Report("FLX0508", $"binary package dependency '{declaredName}' references metadata for package '{metadata.Name}'.");
+        }
+
+        var includeDirs = dependency.IncludeDirs
+            .Where(dir => !string.IsNullOrWhiteSpace(dir))
+            .Select(dir => Path.GetFullPath(Path.Combine(rootDirectory, dir)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var libraries = dependency.Libraries
+            .Where(library => !string.IsNullOrWhiteSpace(library))
+            .Select(library => Path.GetFullPath(Path.Combine(rootDirectory, library)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var binaryPackage = new LoadedBinaryPackage(metadata.Name, metadataPath, includeDirs, libraries, metadata);
+
+        if (_packagesByName.ContainsKey(binaryPackage.Name) ||
+            (_binaryPackagesByName.TryGetValue(binaryPackage.Name, out var existingName) &&
+             !existingName.MetadataPath.Equals(binaryPackage.MetadataPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            diagnostics.Report("FLX0506", $"duplicate package name '{binaryPackage.Name}'.");
+        }
+
+        _binaryPackagesByMetadataPath.Add(binaryPackage.MetadataPath, binaryPackage);
+        if (!_binaryPackagesByName.ContainsKey(binaryPackage.Name))
+            _binaryPackagesByName.Add(binaryPackage.Name, binaryPackage);
+
+        _binaryPackages.Add(binaryPackage);
+        return binaryPackage;
     }
 
     private static PackageManifest? ReadManifest(string manifestPath, DiagnosticBag diagnostics)

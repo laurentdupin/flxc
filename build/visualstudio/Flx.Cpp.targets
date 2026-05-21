@@ -25,7 +25,16 @@
     <ItemGroup>
       <_FlxDefine Include="$(FlxPreprocessorDefinitions)" Condition="'$(FlxPreprocessorDefinitions)' != ''" />
       <_FlxIncludeDir Include="$(FlxAdditionalIncludeDirectories)" Condition="'$(FlxAdditionalIncludeDirectories)' != ''" />
+      <_FlxBinaryIncludeDir Include="@(FlxBinaryPackageReference->'%(IncludeDir)')" Condition="'%(FlxBinaryPackageReference.IncludeDir)' != ''" />
     </ItemGroup>
+
+    <PropertyGroup>
+      <_FlxPackageMetadata Condition="'$(FlxPackageMetadata)' != ''">$(FlxPackageMetadata)</_FlxPackageMetadata>
+      <_FlxPackageMetadata Condition="'$(_FlxPackageMetadata)' == ''">$(FlxPackageOutputDir)\$(MSBuildProjectName).flxmeta.json</_FlxPackageMetadata>
+      <_FlxPublicIncludeDir Condition="'$(FlxPublicIncludeDir)' != ''">$(FlxPublicIncludeDir)</_FlxPublicIncludeDir>
+      <_FlxPublicIncludeDir Condition="'$(_FlxPublicIncludeDir)' == ''">$(FlxPackageOutputDir)\include</_FlxPublicIncludeDir>
+      <_FlxLibraryModeOptions Condition="'$(ConfigurationType)' == 'StaticLibrary'">--build-library --metadata-out &quot;$(_FlxPackageMetadata)&quot; --public-include-dir &quot;$(_FlxPublicIncludeDir)&quot;</_FlxLibraryModeOptions>
+    </PropertyGroup>
 
     <Message Text="FLX: package @(FlxPackage)" Importance="High" Condition="'@(FlxPackage)' != ''" />
     <Message Text="FLX: inputs @(FlxCompile)" Importance="High" Condition="'@(FlxCompile)' != ''" />
@@ -33,7 +42,7 @@
 
     <Exec
       Condition="'@(FlxPackage)' != ''"
-      Command="&quot;$(FlxCompilerPath)&quot; --package @(FlxPackage->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+      Command="&quot;$(FlxCompilerPath)&quot; --package @(FlxPackage->'&quot;%(FullPath)&quot;', ' ') $(_FlxLibraryModeOptions) --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
 
     <Exec
       Condition="'@(FlxCompile)' != ''"
@@ -46,6 +55,7 @@
     <ItemGroup>
       <ClCompile Include="@(FlxGeneratedC)">
         <CompileAs>CompileAsC</CompileAs>
+        <AdditionalIncludeDirectories Condition="'@(_FlxBinaryIncludeDir)' != ''">@(_FlxBinaryIncludeDir->'%(FullPath)')</AdditionalIncludeDirectories>
       </ClCompile>
     </ItemGroup>
 

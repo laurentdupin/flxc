@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Flx.Compiler.Metadata;
 
 namespace Flx.Compiler.Packages;
 
@@ -33,20 +34,57 @@ internal sealed class PackageDependencyManifest
 
     [JsonPropertyName("path")]
     public string Path { get; set; } = "";
+
+    [JsonPropertyName("metadata")]
+    public string Metadata { get; set; } = "";
+
+    [JsonPropertyName("includeDirs")]
+    public List<string> IncludeDirs { get; set; } = [];
+
+    [JsonPropertyName("libraries")]
+    public List<string> Libraries { get; set; } = [];
 }
 
 internal sealed class PackageGraph
 {
-    public PackageGraph(LoadedPackage rootPackage, IReadOnlyList<LoadedPackage> packages)
+    public PackageGraph(
+        LoadedPackage rootPackage,
+        IReadOnlyList<LoadedPackage> packages,
+        IReadOnlyList<LoadedBinaryPackage> binaryPackages)
     {
         RootPackage = rootPackage;
         Packages = packages;
+        BinaryPackages = binaryPackages;
     }
 
     public LoadedPackage RootPackage { get; }
     public IReadOnlyList<LoadedPackage> Packages { get; }
+    public IReadOnlyList<LoadedBinaryPackage> BinaryPackages { get; }
 
     public IEnumerable<LoadedPackage> SourceOrder => Packages;
+}
+
+internal sealed class LoadedBinaryPackage
+{
+    public LoadedBinaryPackage(
+        string name,
+        string metadataPath,
+        IReadOnlyList<string> includeDirs,
+        IReadOnlyList<string> libraries,
+        PackageMetadata metadata)
+    {
+        Name = name;
+        MetadataPath = metadataPath;
+        IncludeDirs = includeDirs;
+        Libraries = libraries;
+        Metadata = metadata;
+    }
+
+    public string Name { get; }
+    public string MetadataPath { get; }
+    public IReadOnlyList<string> IncludeDirs { get; }
+    public IReadOnlyList<string> Libraries { get; }
+    public PackageMetadata Metadata { get; }
 }
 
 internal sealed class LoadedPackage
