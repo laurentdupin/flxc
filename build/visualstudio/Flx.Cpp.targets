@@ -6,11 +6,19 @@
 
   <Target
     Name="FlxGenerateC"
-    Condition="'$(FlxEnabled)' == 'true' and '@(FlxCompile)' != ''">
+    Condition="'$(FlxEnabled)' == 'true' and ('@(FlxCompile)' != '' or '@(FlxPackage)' != '')">
 
     <Error
       Condition="!Exists('$(FlxCompilerPath)')"
       Text="flxc.exe not found at '$(FlxCompilerPath)'. Build Flx.Compiler or set FlxCompilerPath." />
+
+    <Error
+      Condition="'@(FlxPackage)' != '' and '@(FlxCompile)' != ''"
+      Text="FLX project cannot contain both FlxPackage and FlxCompile items yet." />
+
+    <Error
+      Condition="'@(FlxPackage)' != '' and '@(FlxPackage->Count())' != '1'"
+      Text="FLX project can contain only one FlxPackage item for now." />
 
     <MakeDir Directories="$(FlxGeneratedDir)" />
 
@@ -19,10 +27,16 @@
       <_FlxIncludeDir Include="$(FlxAdditionalIncludeDirectories)" Condition="'$(FlxAdditionalIncludeDirectories)' != ''" />
     </ItemGroup>
 
-    <Message Text="FLX: inputs @(FlxCompile)" Importance="High" />
+    <Message Text="FLX: package @(FlxPackage)" Importance="High" Condition="'@(FlxPackage)' != ''" />
+    <Message Text="FLX: inputs @(FlxCompile)" Importance="High" Condition="'@(FlxCompile)' != ''" />
     <Message Text="FLX: generated C directory $(FlxGeneratedDir)" Importance="High" />
 
     <Exec
+      Condition="'@(FlxPackage)' != ''"
+      Command="&quot;$(FlxCompilerPath)&quot; --package @(FlxPackage->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+
+    <Exec
+      Condition="'@(FlxCompile)' != ''"
       Command="&quot;$(FlxCompilerPath)&quot; @(FlxCompile->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
 
     <ReadLinesFromFile File="$(FlxGeneratedList)">

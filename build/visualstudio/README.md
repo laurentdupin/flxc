@@ -4,7 +4,7 @@ This is the first Visual Studio integration layer for `flxc`. It does not define
 
 Build flow:
 
-1. MSBuild runs `flxc --emit-c` for all `FlxCompile` items.
+1. MSBuild runs `flxc --emit-c` for all `FlxCompile` items, or `flxc --package ... --emit-c` for one `FlxPackage` item.
 2. `flxc` writes generated C into `$(IntDir)\flx\`.
 3. `flxc` writes `generated_c_files.txt`.
 4. The target reads that list and adds the generated `.c` files to `ClCompile`.
@@ -39,6 +39,16 @@ Add imports to a `.vcxproj`:
 ...
 <Import Project="path\to\build\visualstudio\Flx.Cpp.targets" />
 ```
+
+Or use package mode:
+
+```xml
+<ItemGroup>
+  <FlxPackage Include="flx.package.json" />
+</ItemGroup>
+```
+
+For now, a project may use either `FlxPackage` or `FlxCompile`, not both. Package mode supports one package manifest item per C++ project.
 
 Useful project properties:
 

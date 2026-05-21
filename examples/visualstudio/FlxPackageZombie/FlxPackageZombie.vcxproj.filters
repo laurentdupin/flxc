@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Package Files">
+      <UniqueIdentifier>{C444251D-5180-4F29-A4E9-1BB0D90FF95E}</UniqueIdentifier>
+      <Extensions>json</Extensions>
+    </Filter>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{D821A16A-5A68-42D9-B741-16B370F7198E}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+    <Filter Include="FLX Source Files\ZombieLib">
+      <UniqueIdentifier>{87767294-ED59-42B8-9C0E-1E337720011C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxPackage Include="flx.package.json">
+      <Filter>FLX Package Files</Filter>
+    </FlxPackage>
+    <None Include="libs\ZombieLib\flx.package.json">
+      <Filter>FLX Package Files</Filter>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="src\Main.flx">
+      <Filter>FLX Source Files</Filter>
+    </None>
+    <None Include="libs\ZombieLib\src\Zombie.flx">
+      <Filter>FLX Source Files\ZombieLib</Filter>
+    </None>
+    <None Include="libs\ZombieLib\src\ZombieGreeting.flx">
+      <Filter>FLX Source Files\ZombieLib</Filter>
+    </None>
+  </ItemGroup>
+</Project>
