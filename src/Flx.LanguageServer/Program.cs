@@ -48,12 +48,27 @@ if (arguments.Contains("--smoke-hover", StringComparer.Ordinal))
     return await RunSmokeAsync(arguments[index + 1], new SmokePosition("textDocument/hover", line, character));
 }
 
+if (arguments.Contains("--smoke-completion", StringComparer.Ordinal))
+{
+    var index = arguments.IndexOf("--smoke-completion");
+    if (index + 3 >= arguments.Count ||
+        !int.TryParse(arguments[index + 2], out var line) ||
+        !int.TryParse(arguments[index + 3], out var character))
+    {
+        Console.Error.WriteLine("usage: flx-lsp --smoke-completion <file.flx> <zero-based-line> <zero-based-character>");
+        return 2;
+    }
+
+    return await RunSmokeAsync(arguments[index + 1], new SmokePosition("textDocument/completion", line, character));
+}
+
 if (!arguments.Contains("--stdio", StringComparer.Ordinal))
 {
     Console.Error.WriteLine("usage: flx-lsp --stdio [--log <path>]");
     Console.Error.WriteLine("       flx-lsp --smoke <file.flx>");
     Console.Error.WriteLine("       flx-lsp --smoke-definition <file.flx> <zero-based-line> <zero-based-character>");
     Console.Error.WriteLine("       flx-lsp --smoke-hover <file.flx> <zero-based-line> <zero-based-character>");
+    Console.Error.WriteLine("       flx-lsp --smoke-completion <file.flx> <zero-based-line> <zero-based-character>");
     return 2;
 }
 

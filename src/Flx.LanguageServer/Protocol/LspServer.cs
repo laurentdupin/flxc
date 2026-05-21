@@ -124,6 +124,11 @@ internal sealed class LspServer
                     await HandleHoverAsync(connection, id.Value, ReadParams<TextDocumentPositionParams>(root), cancellationToken);
                 return false;
 
+            case "textDocument/completion":
+                if (id is not null)
+                    await HandleCompletionAsync(connection, id.Value, ReadParams<TextDocumentPositionParams>(root), cancellationToken);
+                return false;
+
             case "workspace/didChangeWatchedFiles":
                 await HandleDidChangeWatchedFilesAsync(connection, cancellationToken);
                 return false;
@@ -224,6 +229,23 @@ internal sealed class LspServer
         await SendResultAsync(connection, id, result, cancellationToken);
     }
 
+    private async Task HandleCompletionAsync(
+        LspConnection connection,
+        JsonElement id,
+        TextDocumentPositionParams parameters,
+        CancellationToken cancellationToken)
+    {
+        var path = UriToPath(parameters.TextDocument.Uri);
+        var snapshot = Analyze(path);
+        var completions = snapshot
+            .GetCompletions(path, parameters.Position.Line, parameters.Position.Character)
+            .Select(LspTypeConversions.ToLspCompletionItem)
+            .ToArray();
+
+        await LogAsync($"completion {path}:{parameters.Position.Line}:{parameters.Position.Character}: {completions.Length}");
+        await SendResultAsync(connection, id, completions, cancellationToken);
+    }
+
     private async Task HandleDidChangeWatchedFilesAsync(
         LspConnection connection,
         CancellationToken cancellationToken)
@@ -293,7 +315,11 @@ internal sealed class LspServer
                 },
                 documentSymbolProvider = true,
                 definitionProvider = true,
-                hoverProvider = true
+                hoverProvider = true,
+                completionProvider = new
+                {
+                    triggerCharacters = new[] { ".", "<" }
+                }
             },
             serverInfo = new
             {

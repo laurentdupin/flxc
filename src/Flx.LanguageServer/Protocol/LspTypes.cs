@@ -33,6 +33,21 @@ internal static class SymbolKind
     public const int Struct = 23;
 }
 
+internal static class CompletionItemKind
+{
+    public const int Text = 1;
+    public const int Method = 2;
+    public const int Function = 3;
+    public const int Field = 5;
+    public const int Variable = 6;
+    public const int Class = 7;
+    public const int Module = 9;
+    public const int Property = 10;
+    public const int Keyword = 14;
+    public const int Snippet = 15;
+    public const int Struct = 23;
+}
+
 internal sealed record LspPosition(int Line, int Character);
 
 internal sealed record LspRange(LspPosition Start, LspPosition End);
@@ -53,6 +68,15 @@ internal sealed class LspHover
 {
     public required MarkupContent Contents { get; init; }
     public LspRange? Range { get; init; }
+}
+
+internal sealed class LspCompletionItem
+{
+    public required string Label { get; init; }
+    public int Kind { get; init; }
+    public string? Detail { get; init; }
+    public string? Documentation { get; init; }
+    public string? InsertText { get; init; }
 }
 
 internal sealed class LspDiagnostic
@@ -188,6 +212,18 @@ internal static class LspTypeConversions
         };
     }
 
+    public static LspCompletionItem ToLspCompletionItem(FlxCompletionItem item)
+    {
+        return new LspCompletionItem
+        {
+            Label = item.Label,
+            Kind = ToLspCompletionKind(item.Kind),
+            Detail = item.Detail,
+            Documentation = item.Documentation,
+            InsertText = item.InsertText
+        };
+    }
+
     private static LspRange ToLspRange(FlxRange range)
     {
         return new LspRange(
@@ -207,6 +243,25 @@ internal static class LspTypeConversions
             FlxSymbolKind.Global => SymbolKind.Variable,
             FlxSymbolKind.Schedule => SymbolKind.Event,
             _ => SymbolKind.Namespace
+        };
+    }
+
+    private static int ToLspCompletionKind(FlxCompletionKind kind)
+    {
+        return kind switch
+        {
+            FlxCompletionKind.Keyword => CompletionItemKind.Keyword,
+            FlxCompletionKind.Type => CompletionItemKind.Struct,
+            FlxCompletionKind.Function => CompletionItemKind.Function,
+            FlxCompletionKind.Method => CompletionItemKind.Method,
+            FlxCompletionKind.Field => CompletionItemKind.Field,
+            FlxCompletionKind.Variable => CompletionItemKind.Variable,
+            FlxCompletionKind.Module => CompletionItemKind.Module,
+            FlxCompletionKind.Component => CompletionItemKind.Struct,
+            FlxCompletionKind.Prefab => CompletionItemKind.Class,
+            FlxCompletionKind.Global => CompletionItemKind.Variable,
+            FlxCompletionKind.Snippet => CompletionItemKind.Snippet,
+            _ => CompletionItemKind.Text
         };
     }
 }

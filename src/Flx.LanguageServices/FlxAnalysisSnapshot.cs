@@ -2,9 +2,60 @@ namespace Flx.LanguageServices;
 
 public sealed class FlxAnalysisSnapshot
 {
+    private static readonly IReadOnlyList<FlxCompletionItem> KeywordCompletions =
+    [
+        new("module", FlxCompletionKind.Keyword),
+        new("import", FlxCompletionKind.Keyword, insertText: "import c \"\" as "),
+        new("export", FlxCompletionKind.Keyword),
+        new("component", FlxCompletionKind.Keyword),
+        new("prefab", FlxCompletionKind.Keyword),
+        new("schedule", FlxCompletionKind.Keyword, insertText: "schedule {\n    run \n}"),
+        new("run", FlxCompletionKind.Keyword),
+        new("loopto", FlxCompletionKind.Keyword),
+        new("breakloop", FlxCompletionKind.Keyword),
+        new("flatten", FlxCompletionKind.Keyword),
+        new("create", FlxCompletionKind.Keyword),
+        new("return", FlxCompletionKind.Keyword),
+        new("if", FlxCompletionKind.Keyword),
+        new("else", FlxCompletionKind.Keyword),
+        new("while", FlxCompletionKind.Keyword),
+        new("for", FlxCompletionKind.Keyword),
+        new("switch", FlxCompletionKind.Keyword),
+        new("case", FlxCompletionKind.Keyword)
+    ];
+
+    private static readonly IReadOnlyList<FlxCompletionItem> BuiltinCompletions =
+    [
+        new("argc", FlxCompletionKind.Variable, "i32", documentation: "Program argument count."),
+        new("argv", FlxCompletionKind.Variable, "Array<string>", documentation: "Program argument values."),
+        new("void", FlxCompletionKind.Type),
+        new("i32", FlxCompletionKind.Type),
+        new("usize", FlxCompletionKind.Type),
+        new("f32", FlxCompletionKind.Type),
+        new("f64", FlxCompletionKind.Type),
+        new("string", FlxCompletionKind.Type),
+        new("Array", FlxCompletionKind.Type, insertText: "Array<"),
+        new("true", FlxCompletionKind.Keyword),
+        new("false", FlxCompletionKind.Keyword),
+        new("null", FlxCompletionKind.Keyword)
+    ];
+
+    private static readonly IReadOnlyList<FlxCompletionItem> StringMemberCompletions =
+    [
+        new("c_str", FlxCompletionKind.Method, "const char *", "c_str()"),
+        new("length", FlxCompletionKind.Method, "usize", "length()")
+    ];
+
+    private static readonly IReadOnlyList<FlxCompletionItem> ArrayMemberCompletions =
+    [
+        new("length", FlxCompletionKind.Method, "usize", "length()")
+    ];
+
     private readonly IReadOnlyDictionary<string, FlxSymbolDefinition> _definitionsByKey;
     private readonly IReadOnlyDictionary<string, FlxSymbolInfo> _symbolInfosByKey;
     private readonly IReadOnlyDictionary<string, string> _sourceTextsByPath;
+    private readonly IReadOnlyList<FlxFunctionScope> _functionScopes;
+    private readonly IReadOnlyDictionary<string, FlxMemberCompletionSet> _memberCompletionsByType;
     private readonly IReadOnlyList<FlxReference> _references;
 
     internal FlxAnalysisSnapshot(
@@ -13,7 +64,9 @@ public sealed class FlxAnalysisSnapshot
         IReadOnlyList<FlxReference> references,
         IReadOnlyDictionary<string, FlxSymbolDefinition> definitionsByKey,
         IReadOnlyDictionary<string, FlxSymbolInfo> symbolInfosByKey,
-        IReadOnlyDictionary<string, string> sourceTextsByPath)
+        IReadOnlyDictionary<string, string> sourceTextsByPath,
+        IReadOnlyList<FlxFunctionScope> functionScopes,
+        IReadOnlyDictionary<string, FlxMemberCompletionSet> memberCompletionsByType)
     {
         Diagnostics = diagnostics;
         DocumentSymbols = documentSymbols;
@@ -21,6 +74,8 @@ public sealed class FlxAnalysisSnapshot
         _definitionsByKey = definitionsByKey;
         _symbolInfosByKey = symbolInfosByKey;
         _sourceTextsByPath = sourceTextsByPath;
+        _functionScopes = functionScopes;
+        _memberCompletionsByType = memberCompletionsByType;
     }
 
     public IReadOnlyList<FlxDiagnostic> Diagnostics { get; }
@@ -54,7 +109,28 @@ public sealed class FlxAnalysisSnapshot
 
     public IReadOnlyList<FlxCompletionItem> GetCompletions(string path, int line, int character)
     {
-        return [];
+        var fullPath = Path.GetFullPath(path);
+        if (!_sourceTextsByPath.TryGetValue(fullPath, out var text) ||
+            !TryGetLine(text, line, out var lineText))
+        {
+            return [];
+        }
+
+        var beforeCursor = lineText[..Math.Clamp(character, 0, lineText.Length)];
+        if (TryGetDotTarget(beforeCursor, out var targetExpression))
+        {
+            return TryResolveExpressionType(fullPath, line, character, targetExpression, out var targetType)
+                ? GetMemberCompletions(targetType)
+                : [];
+        }
+
+        if (IsScheduleRunContext(beforeCursor))
+            return UniqueCompletionItems(GetSymbolCompletions(onlyFunctions: true));
+
+        return UniqueCompletionItems(
+            KeywordCompletions
+                .Concat(BuiltinCompletions)
+                .Concat(GetSymbolCompletions(onlyFunctions: false)));
     }
 
     private FlxReference? FindReference(
@@ -152,6 +228,195 @@ public sealed class FlxAnalysisSnapshot
             lines.Add($"module {info.ModuleName}");
 
         return string.Join("\n", lines);
+    }
+
+    private IReadOnlyList<FlxCompletionItem> GetMemberCompletions(string typeName)
+    {
+        if (typeName == "string")
+            return StringMemberCompletions;
+
+        if (typeName.StartsWith("Array<", StringComparison.Ordinal))
+            return ArrayMemberCompletions;
+
+        return _memberCompletionsByType.TryGetValue(typeName, out var completions)
+            ? completions.Items
+            : [];
+    }
+
+    private IEnumerable<FlxCompletionItem> GetSymbolCompletions(bool onlyFunctions)
+    {
+        var candidates = _symbolInfosByKey.Values
+            .Where(info => IsCompletionSymbol(info.Kind, onlyFunctions))
+            .OrderBy(info => CompletionSortRank(info.Kind))
+            .ThenBy(info => info.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        var shortNameCounts = candidates
+            .GroupBy(info => ShortName(info.FullName), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        foreach (var info in candidates)
+        {
+            var shortName = ShortName(info.FullName);
+            var label = shortNameCounts[shortName] == 1 ? shortName : info.FullName;
+            yield return new FlxCompletionItem(
+                label,
+                ToCompletionKind(info.Kind),
+                info.Display,
+                insertText: label,
+                documentation: info.Detail);
+        }
+    }
+
+    private bool TryResolveExpressionType(
+        string fullPath,
+        int line,
+        int character,
+        string expression,
+        out string typeName)
+    {
+        typeName = expression switch
+        {
+            "argv" => "Array<string>",
+            "argc" => "i32",
+            _ => ""
+        };
+
+        if (typeName.Length > 0)
+            return true;
+
+        var parts = expression.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+            return false;
+
+        var scope = FindScope(fullPath, line, character);
+        if (scope is null || !scope.VariableTypes.TryGetValue(parts[0], out var resolvedType))
+            return false;
+
+        typeName = resolvedType;
+        for (var index = 1; index < parts.Length; index++)
+        {
+            if (!_memberCompletionsByType.TryGetValue(typeName, out var members) ||
+                !members.FieldTypes.TryGetValue(parts[index], out resolvedType))
+            {
+                return false;
+            }
+
+            typeName = resolvedType;
+        }
+
+        return true;
+    }
+
+    private FlxFunctionScope? FindScope(string fullPath, int line, int character)
+    {
+        return _functionScopes
+            .Where(scope => PathsEqual(scope.Path, fullPath) && Contains(scope.BodyRange, line, character))
+            .OrderBy(scope => RangeLength(scope.BodyRange))
+            .FirstOrDefault();
+    }
+
+    private static bool TryGetDotTarget(string beforeCursor, out string targetExpression)
+    {
+        targetExpression = "";
+        var end = beforeCursor.TrimEnd().Length;
+        if (end == 0)
+            return false;
+
+        var position = end - 1;
+        while (position >= 0 && IsIdentifierPart(beforeCursor[position]))
+            position--;
+
+        if (position < 0 || beforeCursor[position] != '.')
+            return false;
+
+        position--;
+        while (position >= 0 && (IsIdentifierPart(beforeCursor[position]) || beforeCursor[position] == '.'))
+            position--;
+
+        var dotIndex = beforeCursor.LastIndexOf('.', end - 1);
+        targetExpression = beforeCursor[(position + 1)..dotIndex].Trim('.');
+        return targetExpression.Length > 0;
+    }
+
+    private static bool IsScheduleRunContext(string beforeCursor)
+    {
+        var trimmed = beforeCursor.TrimEnd();
+        if (trimmed.Length == 0)
+            return false;
+
+        var lastRun = trimmed.LastIndexOf("run", StringComparison.Ordinal);
+        if (lastRun < 0)
+            return false;
+
+        var beforeRun = lastRun == 0 ? '\0' : trimmed[lastRun - 1];
+        if (beforeRun != '\0' && IsIdentifierPart(beforeRun))
+            return false;
+
+        var afterRun = lastRun + "run".Length;
+        return afterRun == trimmed.Length ||
+               (afterRun < trimmed.Length && char.IsWhiteSpace(trimmed[afterRun]));
+    }
+
+    private static IReadOnlyList<FlxCompletionItem> UniqueCompletionItems(IEnumerable<FlxCompletionItem> items)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<FlxCompletionItem>();
+        foreach (var item in items)
+        {
+            var key = item.Label + "\u001f" + item.Kind;
+            if (seen.Add(key))
+                result.Add(item);
+        }
+
+        return result;
+    }
+
+    private static bool IsCompletionSymbol(FlxSymbolKind kind, bool onlyFunctions)
+    {
+        if (onlyFunctions)
+            return kind is FlxSymbolKind.Function or FlxSymbolKind.Method;
+
+        return kind is FlxSymbolKind.Module or
+               FlxSymbolKind.Component or
+               FlxSymbolKind.Prefab or
+               FlxSymbolKind.Function or
+               FlxSymbolKind.Method or
+               FlxSymbolKind.Global;
+    }
+
+    private static int CompletionSortRank(FlxSymbolKind kind)
+    {
+        return kind switch
+        {
+            FlxSymbolKind.Module => 0,
+            FlxSymbolKind.Prefab => 1,
+            FlxSymbolKind.Component => 2,
+            FlxSymbolKind.Global => 3,
+            FlxSymbolKind.Function => 4,
+            FlxSymbolKind.Method => 5,
+            _ => 10
+        };
+    }
+
+    private static FlxCompletionKind ToCompletionKind(FlxSymbolKind kind)
+    {
+        return kind switch
+        {
+            FlxSymbolKind.Module => FlxCompletionKind.Module,
+            FlxSymbolKind.Component => FlxCompletionKind.Component,
+            FlxSymbolKind.Prefab => FlxCompletionKind.Prefab,
+            FlxSymbolKind.Function => FlxCompletionKind.Function,
+            FlxSymbolKind.Method => FlxCompletionKind.Method,
+            FlxSymbolKind.Global => FlxCompletionKind.Global,
+            _ => FlxCompletionKind.Variable
+        };
+    }
+
+    private static string ShortName(string fullName)
+    {
+        var dot = fullName.LastIndexOf('.');
+        return dot < 0 ? fullName : fullName[(dot + 1)..];
     }
 
     private static (string Name, FlxRange Range)? TryReadToken(string text, int line, int character)

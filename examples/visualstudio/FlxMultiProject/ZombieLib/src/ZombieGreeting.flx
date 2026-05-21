@@ -4,4 +4,5 @@ import c "stdio.h" as stdio
 
 export void SayHello(zombies.Zombie z) {
     stdio.printf("Hello %s\n", z.name.c_str());
+    z.SayHello();
 }

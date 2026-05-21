@@ -20,7 +20,7 @@ public sealed class FlxWorkspace
         RegexOptions.Multiline);
 
     private static readonly Regex LocalDeclarationRegex = new(
-        @"\b(?<type>" + QualifiedNamePattern + @")\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\b",
+        @"\b(?<type>" + QualifiedNamePattern + @"(?:<" + QualifiedNamePattern + @">)?)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\b",
         RegexOptions.Multiline);
 
     private static readonly Regex MethodCallRegex = new(
@@ -117,7 +117,9 @@ public sealed class FlxWorkspace
             CollectReferences(model).ToArray(),
             CollectDefinitions(model, packageGraph),
             CollectSymbolInfos(model, packageGraph),
-            sources.ToDictionary(source => source.FullPath, source => source.Text, StringComparer.OrdinalIgnoreCase));
+            sources.ToDictionary(source => source.FullPath, source => source.Text, StringComparer.OrdinalIgnoreCase),
+            CollectFunctionScopes(model).ToArray(),
+            CollectMemberCompletions(model));
     }
 
     private PackageGraph? LoadPackageGraph(DiagnosticBag diagnostics)
@@ -576,6 +578,97 @@ public sealed class FlxWorkspace
         return "flattens " + string.Join(", ", components.Select(component => component.FullName));
     }
 
+    private static IEnumerable<FlxFunctionScope> CollectFunctionScopes(CompilationModel model)
+    {
+        foreach (var module in model.Modules)
+        {
+            foreach (var function in module.Functions)
+            {
+                var variableTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var parameter in function.Parameters)
+                    variableTypes[parameter.Name] = NormalizeCompletionType(model, module, parameter.Type);
+
+                foreach (Match match in LocalDeclarationRegex.Matches(function.Syntax.BodyText))
+                {
+                    var typeName = match.Groups["type"].Value;
+                    var variableName = match.Groups["name"].Value;
+                    variableTypes.TryAdd(variableName, NormalizeCompletionType(model, module, typeName));
+                }
+
+                yield return new FlxFunctionScope
+                {
+                    Path = function.SourceFile.FullPath,
+                    BodyRange = RangeFromOffsets(
+                        function.SourceFile,
+                        function.Syntax.BodyStart,
+                        function.Syntax.BodyStart + function.Syntax.BodyText.Length),
+                    VariableTypes = variableTypes
+                };
+            }
+        }
+    }
+
+    private static IReadOnlyDictionary<string, FlxMemberCompletionSet> CollectMemberCompletions(CompilationModel model)
+    {
+        var result = new Dictionary<string, FlxMemberCompletionSet>(StringComparer.Ordinal);
+        foreach (var prefab in model.PrefabsByFullName.Values.OrderBy(prefab => prefab.FullName, StringComparer.Ordinal))
+        {
+            var items = new List<FlxCompletionItem>();
+            var fieldTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var field in prefab.Fields.OrderBy(field => field.Field.Name, StringComparer.Ordinal))
+            {
+                var fieldType = NormalizeCompletionType(model, null, field.Field.Type);
+                fieldTypes[field.Field.Name] = fieldType;
+                items.Add(new FlxCompletionItem(
+                    field.Field.Name,
+                    FlxCompletionKind.Field,
+                    $"{field.Field.Type} field from {field.Component.FullName}",
+                    field.Field.Name));
+            }
+
+            foreach (var method in model.MethodRegistry.AllMethods
+                         .Where(method => method.ReceiverType == prefab.FullName && method.Parameters.Count == 1)
+                         .OrderBy(method => method.SourceName, StringComparer.Ordinal))
+            {
+                items.Add(new FlxCompletionItem(
+                    method.SourceName,
+                    FlxCompletionKind.Method,
+                    FormatFunctionDetail(method),
+                    method.SourceName + "()"));
+            }
+
+            result[prefab.FullName] = new FlxMemberCompletionSet
+            {
+                TypeName = prefab.FullName,
+                Items = items,
+                FieldTypes = fieldTypes
+            };
+        }
+
+        return result;
+    }
+
+    private static string NormalizeCompletionType(CompilationModel model, ModuleSymbol? module, string typeName)
+    {
+        if (typeName == "string" ||
+            typeName == "i32" ||
+            typeName == "usize" ||
+            typeName == "f32" ||
+            typeName == "f64" ||
+            typeName.StartsWith("Array<", StringComparison.Ordinal))
+        {
+            return typeName;
+        }
+
+        if (module is not null && model.ResolvePrefab(typeName, module) is { } modulePrefab)
+            return modulePrefab.FullName;
+
+        return model.PrefabsByFullName.TryGetValue(typeName, out var prefab)
+            ? prefab.FullName
+            : typeName;
+    }
+
     private static IEnumerable<FlxReference> CollectReferences(CompilationModel model)
     {
         var references = new List<FlxReference>();
@@ -995,6 +1088,13 @@ public sealed class FlxWorkspace
     {
         var start = ToPosition(location);
         return new FlxRange(start, new FlxPosition(start.Line, start.Character + Math.Max(1, length)));
+    }
+
+    private static FlxRange RangeFromOffsets(SourceFile source, int start, int end)
+    {
+        return new FlxRange(
+            ToPosition(source.GetLocation(start)),
+            ToPosition(source.GetLocation(end)));
     }
 
     private static string ComponentKey(string fullName) => "component:" + fullName;

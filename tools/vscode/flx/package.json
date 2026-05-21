@@ -2,7 +2,7 @@
   "name": "flx-language",
   "displayName": "FLX Language Support",
   "description": "Syntax highlighting and basic editor support for FLX.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "flx",
   "main": "./out/extension.js",
   "activationEvents": [

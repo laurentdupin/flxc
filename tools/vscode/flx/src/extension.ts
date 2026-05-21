@@ -77,8 +77,6 @@ function resolveServerPath(
   const candidates = [
     context.asAbsolutePath(path.join("server-bundle", "flx-lsp.exe")),
     context.asAbsolutePath(path.join("server-bundle", "flx-lsp")),
-    context.asAbsolutePath(path.join("server", "flx-lsp.exe")),
-    context.asAbsolutePath(path.join("server", "flx-lsp")),
     path.resolve(context.extensionPath, "../../../src/Flx.LanguageServer/bin/Debug/net10.0/flx-lsp.exe"),
     path.resolve(context.extensionPath, "../../../src/Flx.LanguageServer/bin/Debug/net10.0/flx-lsp"),
     path.resolve(context.extensionPath, "../../../src/Flx.LanguageServer/bin/Release/net10.0/flx-lsp.exe"),
