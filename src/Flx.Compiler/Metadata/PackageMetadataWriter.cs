@@ -72,6 +72,8 @@ internal static class PackageMetadataWriter
                     Type = parameter.Type,
                     Name = parameter.Name
                 }).ToList(),
+                Parallelizable = function.ParallelInfo.CanRunParallel,
+                ParallelReason = function.ParallelInfo.ReasonIfNot,
                 Line = function.Location.Line,
                 Column = function.Location.Column
             }).ToList();

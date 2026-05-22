@@ -7,6 +7,7 @@ public sealed class FlxAnalysisSnapshot
         new("module", FlxCompletionKind.Keyword),
         new("import", FlxCompletionKind.Keyword, insertText: "import c \"\" as "),
         new("export", FlxCompletionKind.Keyword),
+        new("parallel", FlxCompletionKind.Keyword),
         new("component", FlxCompletionKind.Keyword),
         new("prefab", FlxCompletionKind.Keyword),
         new("schedule", FlxCompletionKind.Keyword, insertText: "schedule {\n    run \n}"),

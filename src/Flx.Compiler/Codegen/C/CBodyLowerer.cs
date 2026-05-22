@@ -47,6 +47,8 @@ internal sealed class CBodyLowerer
                 var loweredHeader = LowerExpression(statement.ForHeader, scope);
                 loweredHeader = CBodyRewriter.RewriteProgramArguments(loweredHeader);
                 builder.AppendLine($"{indent}for ({loweredHeader}) {{");
+                if (TryReadForHeaderLocal(statement.ForHeader, out var forVariableName, out var forVariableType))
+                    scope.Declare(forVariableName, forVariableType);
                 LowerStatements(statement.Body ?? "", builder, indent + "    ", scope);
                 builder.AppendLine($"{indent}}}");
                 continue;
@@ -122,6 +124,15 @@ internal sealed class CBodyLowerer
                 var temporaryName = NextTemporaryName();
                 builder.AppendLine($"{indent}flx_string {temporaryName} = flx_string_from_static({valueText}, {StringLiteralLength(valueText)});");
                 builder.AppendLine($"{indent}flx_string_assign({fieldTarget}, &{temporaryName});");
+                return;
+            }
+
+            if (TryLowerStringConcatI32(valueText, scope, out var concatExpression))
+            {
+                var temporaryName = NextTemporaryName();
+                builder.AppendLine($"{indent}flx_string {temporaryName} = {concatExpression};");
+                builder.AppendLine($"{indent}flx_string_assign({fieldTarget}, &{temporaryName});");
+                builder.AppendLine($"{indent}flx_string_destroy(&{temporaryName});");
                 return;
             }
 
@@ -229,6 +240,37 @@ internal sealed class CBodyLowerer
             return $"&{expression}";
 
         return expression;
+    }
+
+    private bool TryLowerStringConcatI32(string expression, Scope scope, out string lowered)
+    {
+        lowered = "";
+
+        var literalPlusInteger = Regex.Match(
+            expression,
+            @"^(?<left>""(?:\\.|[^""\\])*"")\s*\+\s*(?<right>[A-Za-z_][A-Za-z0-9_]*)$");
+        if (literalPlusInteger.Success && IsIntegerLike(scope.Lookup(literalPlusInteger.Groups["right"].Value)))
+        {
+            var literal = literalPlusInteger.Groups["left"].Value;
+            var right = LowerExpression(literalPlusInteger.Groups["right"].Value, scope);
+            lowered = $"flx_string_concat_i32(flx_string_from_static({literal}, {StringLiteralLength(literal)}), {right})";
+            return true;
+        }
+
+        var stringVariablePlusInteger = Regex.Match(
+            expression,
+            @"^(?<left>[A-Za-z_][A-Za-z0-9_]*)\s*\+\s*(?<right>[A-Za-z_][A-Za-z0-9_]*)$");
+        if (stringVariablePlusInteger.Success &&
+            scope.Lookup(stringVariablePlusInteger.Groups["left"].Value) == "string" &&
+            IsIntegerLike(scope.Lookup(stringVariablePlusInteger.Groups["right"].Value)))
+        {
+            var left = stringVariablePlusInteger.Groups["left"].Value;
+            var right = LowerExpression(stringVariablePlusInteger.Groups["right"].Value, scope);
+            lowered = $"flx_string_concat_i32({left}, {right})";
+            return true;
+        }
+
+        return false;
     }
 
     private bool TryResolvePrefabField(Scope scope, string variableName, string fieldName, out string target, out PrefabFieldSymbol field)
@@ -427,6 +469,19 @@ internal sealed class CBodyLowerer
 
     private static bool IsIdentifierPart(char c) => c == '_' || char.IsLetterOrDigit(c);
 
+    private static bool TryReadForHeaderLocal(string header, out string name, out string type)
+    {
+        name = "";
+        type = "";
+        var match = Regex.Match(header, @"^\s*(?<type>i32|usize)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=");
+        if (!match.Success)
+            return false;
+
+        name = match.Groups["name"].Value;
+        type = match.Groups["type"].Value;
+        return true;
+    }
+
     private static IReadOnlyList<string> ParseStringLiteralList(string text)
     {
         var values = new List<string>();
@@ -473,6 +528,11 @@ internal sealed class CBodyLowerer
     private static bool IsStringLiteral(string expression)
     {
         return Regex.IsMatch(expression, "^\"(?:\\\\.|[^\"\\\\])*\"$");
+    }
+
+    private static bool IsIntegerLike(string? type)
+    {
+        return type is "i32" or "usize";
     }
 
     private string NextTemporaryName()

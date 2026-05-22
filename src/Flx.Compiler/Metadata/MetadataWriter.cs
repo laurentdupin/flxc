@@ -36,6 +36,8 @@ internal static class MetadataWriter
                     Type = parameter.Type,
                     Name = parameter.Name
                 }).ToList(),
+                Parallelizable = function.ParallelInfo.CanRunParallel,
+                ParallelReason = function.ParallelInfo.ReasonIfNot,
                 Line = function.Location.Line,
                 Column = function.Location.Column
             }).ToList(),
@@ -89,13 +91,18 @@ internal static class MetadataWriter
     private static ScheduleStepMetadata ToRunMetadataStep(RunStepSyntax run, CompilationModel model, ModuleSymbol module)
     {
         var resolution = ScheduleTargetResolver.Resolve(model, run, module);
+        var execution = resolution.Functions.Count > 0 &&
+                        resolution.Functions.All(function => function.ParallelInfo.CanRunParallel)
+            ? "parallel"
+            : "serial";
         return new ScheduleStepMetadata
         {
             Kind = "run",
             Name = run.Name,
             Target = run.Name,
             IsWildcard = run.Target.HasWildcard,
-            ExpandedTargets = resolution.FunctionGroupFullNames.ToList()
+            ExpandedTargets = resolution.FunctionGroupFullNames.ToList(),
+            Execution = execution
         };
     }
 }

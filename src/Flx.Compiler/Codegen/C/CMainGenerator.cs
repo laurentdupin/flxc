@@ -30,6 +30,8 @@ internal sealed class CMainGenerator
             builder.AppendLine();
         }
 
+        AppendParallelHelpers(builder, schedule, model);
+
         builder.AppendLine("int main(int c_argc, char **c_argv) {");
         if (model.RequiresProgramArguments)
         {
@@ -120,11 +122,63 @@ internal sealed class CMainGenerator
             return;
         }
 
+        if (CanRunScheduleStepParallel(function, model))
+        {
+            var helperName = ParallelHelperName(function);
+            builder.AppendLine($"    {helperName}_ctx {helperName}_data = {{ &world }};");
+            builder.AppendLine($"    flx_parallel_for(world.{CTypeNames.CountField(function.Parameters[0].Type)}, 1, {helperName}_range, &{helperName}_data);");
+            return;
+        }
+
         var prefabName = function.Parameters[0].Type;
         builder.AppendLine($"    for (usize i = 0; i < world.{CTypeNames.CountField(prefabName)}; ++i) {{");
         builder.AppendLine($"        {CTypeNames.ViewType(prefabName)} {function.Parameters[0].Name} = {CTypeNames.GetFunction(prefabName)}(&world, i);");
         builder.AppendLine($"        {function.MangledName}({function.Parameters[0].Name});");
         builder.AppendLine("    }");
+    }
+
+    private static void AppendParallelHelpers(StringBuilder builder, ScheduleDeclSyntax schedule, CompilationModel model)
+    {
+        var helpers = schedule.Steps
+            .OfType<RunStepSyntax>()
+            .SelectMany(step => ResolveRun(model, step))
+            .Where(function => CanRunScheduleStepParallel(function, model))
+            .DistinctBy(function => function.MangledName)
+            .OrderBy(function => function.FullName, StringComparer.Ordinal)
+            .ThenBy(function => function.MangledName, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var function in helpers)
+        {
+            var helperName = ParallelHelperName(function);
+            var prefabName = function.Parameters[0].Type;
+            var parameterName = function.Parameters[0].Name;
+
+            builder.AppendLine($"typedef struct {helperName}_ctx {{");
+            builder.AppendLine("    flx_world *world;");
+            builder.AppendLine($"}} {helperName}_ctx;");
+            builder.AppendLine();
+            builder.AppendLine($"static void {helperName}_range(void *user, usize begin, usize end) {{");
+            builder.AppendLine($"    {helperName}_ctx *ctx = ({helperName}_ctx *)user;");
+            builder.AppendLine("    for (usize i = begin; i < end; ++i) {");
+            builder.AppendLine($"        {CTypeNames.ViewType(prefabName)} {parameterName} = {CTypeNames.GetFunction(prefabName)}(ctx->world, i);");
+            builder.AppendLine($"        {function.MangledName}({parameterName});");
+            builder.AppendLine("    }");
+            builder.AppendLine("}");
+            builder.AppendLine();
+        }
+    }
+
+    private static bool CanRunScheduleStepParallel(FunctionSymbol function, CompilationModel model)
+    {
+        return function.Parameters.Count == 1 &&
+               model.PrefabsByFullName.ContainsKey(function.Parameters[0].Type) &&
+               function.ParallelInfo.CanRunParallel;
+    }
+
+    private static string ParallelHelperName(FunctionSymbol function)
+    {
+        return "flx_parallel_" + CTypeNames.SafeIdentifier(function.MangledName);
     }
 
     private static string FormatLabel(string labelName) => "flx_schedule_label_" + CTypeNames.SafeIdentifier(labelName);

@@ -77,7 +77,7 @@
         },
         {
           "name": "keyword.declaration.flx",
-          "match": "\\b(module|import|c|as|component|prefab|abstract|tag|flatten|schedule|run|loopto|jumpto|consumeevents|oncreate|ondestroy|side|create|destroy|extends|is)\\b"
+          "match": "\\b(module|import|c|as|parallel|component|prefab|abstract|tag|flatten|schedule|run|loopto|jumpto|consumeevents|oncreate|ondestroy|side|create|destroy|extends|is)\\b"
         },
         {
           "name": "storage.modifier.flx",

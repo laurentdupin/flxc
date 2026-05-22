@@ -22,6 +22,8 @@ internal sealed class FunctionMetadata
     public string ReturnType { get; set; } = "";
     public string? ReceiverType { get; set; }
     public List<ParameterMetadata> Parameters { get; set; } = [];
+    public bool Parallelizable { get; set; }
+    public string? ParallelReason { get; set; }
     public int Line { get; set; }
     public int Column { get; set; }
 }
@@ -77,4 +79,5 @@ internal sealed class ScheduleStepMetadata
     public string Target { get; set; } = "";
     public bool IsWildcard { get; set; }
     public List<string> ExpandedTargets { get; set; } = [];
+    public string Execution { get; set; } = "serial";
 }

@@ -1,0 +1,8 @@
+parallel game.zombies.Update;
+
+void MainStep() {
+}
+
+schedule {
+    run MainStep;
+}

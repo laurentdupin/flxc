@@ -1,0 +1,27 @@
+import c "stdio.h" as stdio
+
+parallel stdio.printf;
+
+export component ZombieData {
+    string name = "";
+}
+
+export prefab Zombie {
+    flatten ZombieData;
+}
+
+void CreateZombies() {
+    for (i32 i = 0; i < 10; ++i) {
+        Zombie z = create Zombie;
+        z.name = "Marcus " + i;
+    }
+}
+
+void Greet(Zombie z) {
+    stdio.printf("Hello %s\n", z.name.c_str());
+}
+
+schedule {
+    run CreateZombies;
+    run Greet;
+}

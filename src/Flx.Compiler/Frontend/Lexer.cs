@@ -95,6 +95,7 @@ internal sealed class Lexer
             "run" => TokenKind.RunKeyword,
             "loopto" => TokenKind.LoopToKeyword,
             "export" => TokenKind.ExportKeyword,
+            "parallel" => TokenKind.ParallelKeyword,
             "component" => TokenKind.ComponentKeyword,
             "prefab" => TokenKind.PrefabKeyword,
             _ => TokenKind.Identifier

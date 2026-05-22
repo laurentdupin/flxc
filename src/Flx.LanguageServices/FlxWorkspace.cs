@@ -488,6 +488,22 @@ public sealed class FlxWorkspace
 
             foreach (var function in module.Functions)
                 infos[FunctionKey(function)] = CreateFunctionInfo(function);
+
+            foreach (var parallel in module.ParallelExternalCalls)
+            {
+                var key = ParallelExternalKey(module.SourceFile.FullPath, parallel.FullName);
+                infos[key] = new FlxSymbolInfo
+                {
+                    Key = key,
+                    FullName = parallel.FullName,
+                    Kind = FlxSymbolKind.Function,
+                    Display = $"{parallel.FullName} allowed in parallel scheduled jobs",
+                    Detail = "Calls may execute concurrently and unordered. The programmer accepts responsibility for external side effects.",
+                    PackageName = module.SourceFile.PackageName,
+                    ModuleName = module.Name,
+                    SourcePath = module.SourceFile.FullPath
+                };
+            }
         }
 
         AddBinaryPackageSymbolInfos(packageGraph, infos);
@@ -688,6 +704,7 @@ public sealed class FlxWorkspace
         foreach (var module in model.Modules)
         {
             CollectDeclarationReferences(module, references);
+            CollectParallelExternalReferences(module, references);
             CollectScheduleReferences(model, module, references);
 
             foreach (var prefab in module.Prefabs)
@@ -757,6 +774,20 @@ public sealed class FlxWorkspace
                 FunctionKey(function),
                 function.FullName,
                 kind));
+        }
+    }
+
+    private static void CollectParallelExternalReferences(ModuleSymbol module, List<FlxReference> references)
+    {
+        foreach (var parallel in module.ParallelExternalCalls)
+        {
+            references.Add(CreateReference(
+                module.SourceFile.FullPath,
+                RangeFromLocation(parallel.Location, parallel.FullName.Length),
+                FlxReferenceKind.ParallelExternal,
+                ParallelExternalKey(module.SourceFile.FullPath, parallel.FullName),
+                parallel.FullName,
+                FlxSymbolKind.Function));
         }
     }
 
@@ -1215,6 +1246,7 @@ public sealed class FlxWorkspace
     private static string FunctionKey(FunctionSymbol function) => "function:" + function.MangledName;
     private static string GlobalKey(string fullName) => "global:" + fullName;
     private static string ModuleKey(string fullName) => "module:" + fullName;
+    private static string ParallelExternalKey(string path, string fullName) => "parallel-external:" + Path.GetFullPath(path) + ":" + fullName;
     private static string PrefabKey(string fullName) => "prefab:" + fullName;
 
     private static FlxDocumentSymbol CreateSymbol(

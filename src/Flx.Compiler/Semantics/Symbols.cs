@@ -18,6 +18,21 @@ internal sealed class CImportSymbol
     public SourceLocation Location { get; }
 }
 
+internal sealed class ParallelExternalSymbol
+{
+    public ParallelExternalSymbol(string alias, string name, SourceLocation location)
+    {
+        Alias = alias;
+        Name = name;
+        Location = location;
+    }
+
+    public string Alias { get; }
+    public string Name { get; }
+    public string FullName => Alias + "." + Name;
+    public SourceLocation Location { get; }
+}
+
 internal sealed class ParameterSymbol
 {
     public ParameterSymbol(string type, string name, SourceLocation location)
@@ -155,7 +170,23 @@ internal sealed class FunctionSymbol
     public string? ReceiverType { get; set; }
     public bool IsExternal { get; }
     public bool IsExported { get; }
+    public FunctionParallelInfo ParallelInfo { get; set; } = FunctionParallelInfo.Serial("not analyzed");
     public bool NeedsWorld => !IsExternal && Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
+}
+
+internal sealed class FunctionParallelInfo
+{
+    private FunctionParallelInfo(bool canRunParallel, string? reasonIfNot)
+    {
+        CanRunParallel = canRunParallel;
+        ReasonIfNot = reasonIfNot;
+    }
+
+    public bool CanRunParallel { get; }
+    public string? ReasonIfNot { get; }
+
+    public static FunctionParallelInfo Parallel() => new(true, null);
+    public static FunctionParallelInfo Serial(string reason) => new(false, reason);
 }
 
 internal sealed class GlobalVariableSymbol
@@ -208,6 +239,8 @@ internal sealed class ModuleSymbol
     public bool IsRoot => Name.Length == 0;
     public List<CImportSymbol> CImports { get; } = [];
     public Dictionary<string, CImportSymbol> CImportsByAlias { get; } = new(StringComparer.Ordinal);
+    public List<ParallelExternalSymbol> ParallelExternalCalls { get; } = [];
+    public Dictionary<string, ParallelExternalSymbol> ParallelExternalCallsByName { get; } = new(StringComparer.Ordinal);
     public List<ComponentSymbol> Components { get; } = [];
     public List<PrefabSymbol> Prefabs { get; } = [];
     public List<GlobalVariableSymbol> Globals { get; } = [];

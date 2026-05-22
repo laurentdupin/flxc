@@ -7,7 +7,8 @@ internal enum FlxReferenceKind
     TypeName,
     FlattenComponent,
     CreatePrefab,
-    MethodCall
+    MethodCall,
+    ParallelExternal
 }
 
 internal sealed class FlxReference

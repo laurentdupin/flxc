@@ -29,6 +29,7 @@ internal sealed class Parser
                         _diagnostics.Report("FLX0402", "only one module declaration is allowed per file.", Current.Location);
 
                     if (unit.CImports.Count > 0 ||
+                        unit.ParallelExternalCalls.Count > 0 ||
                         unit.Components.Count > 0 ||
                         unit.Prefabs.Count > 0 ||
                         unit.Globals.Count > 0 ||
@@ -42,6 +43,9 @@ internal sealed class Parser
                     break;
                 case TokenKind.ImportKeyword:
                     unit.CImports.Add(ParseCImport());
+                    break;
+                case TokenKind.ParallelKeyword:
+                    unit.ParallelExternalCalls.Add(ParseParallelExternalDecl());
                     break;
                 case TokenKind.ScheduleKeyword:
                     unit.Schedules.Add(ParseSchedule());
@@ -89,6 +93,33 @@ internal sealed class Parser
             Advance();
 
         return new CImportSyntax(header.Value ?? "", alias.Text, importToken.Location);
+    }
+
+    private ParallelExternalDeclSyntax ParseParallelExternalDecl()
+    {
+        var parallelToken = Expect(TokenKind.ParallelKeyword, "expected 'parallel'.");
+        var alias = ExpectIdentifier("expected imported C alias after 'parallel'.");
+        var targetLocation = alias.Location;
+
+        if (Current.Kind != TokenKind.Dot)
+        {
+            _diagnostics.Report("FLX0701", "'parallel' currently only supports imported C functions.", alias.Location);
+            SkipToTopLevelSemicolon();
+            return new ParallelExternalDeclSyntax(alias.Text, "", parallelToken.Location, targetLocation);
+        }
+
+        Advance();
+        var member = ExpectIdentifier("expected imported C function name after '.'.");
+
+        if (Current.Kind == TokenKind.Dot)
+        {
+            _diagnostics.Report("FLX0701", "'parallel' currently only supports imported C functions.", targetLocation);
+            SkipToTopLevelSemicolon();
+            return new ParallelExternalDeclSyntax(alias.Text, member.Text, parallelToken.Location, targetLocation);
+        }
+
+        Expect(TokenKind.Semicolon, "expected ';' after parallel declaration.");
+        return new ParallelExternalDeclSyntax(alias.Text, member.Text, parallelToken.Location, targetLocation);
     }
 
     private void ParseExportedDeclaration(CompilationUnitSyntax unit)
@@ -364,6 +395,15 @@ internal sealed class Parser
         }
 
         _diagnostics.Report("FLX0011", message, Current.Location);
+    }
+
+    private void SkipToTopLevelSemicolon()
+    {
+        while (Current.Kind != TokenKind.Semicolon && Current.Kind != TokenKind.EndOfFile)
+            Advance();
+
+        if (Current.Kind == TokenKind.Semicolon)
+            Advance();
     }
 
     private Token ExpectIdentifier(string message)

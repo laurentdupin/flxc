@@ -34,6 +34,7 @@ internal sealed class SemanticAnalyzer
             var module = new ModuleSymbol(unit.Source, unit);
             model.Modules.Add(module);
             BindImports(unit, module);
+            BindParallelExternalCalls(unit, module);
             model.Schedules.AddRange(unit.Schedules);
         }
 
@@ -57,6 +58,7 @@ internal sealed class SemanticAnalyzer
             BindFunctions(module.Syntax, module, model, model.FunctionRegistry);
 
         RegisterMethods(model);
+        AnalyzeFunctionParallelism(model);
         CheckSchedules(model, requireSchedule, validateScheduleTargets);
         CheckFunctionBodies(model);
 
@@ -257,6 +259,31 @@ internal sealed class SemanticAnalyzer
         }
     }
 
+    private void BindParallelExternalCalls(CompilationUnitSyntax unit, ModuleSymbol module)
+    {
+        foreach (var parallel in unit.ParallelExternalCalls)
+        {
+            if (string.IsNullOrWhiteSpace(parallel.Alias) ||
+                string.IsNullOrWhiteSpace(parallel.Name))
+            {
+                continue;
+            }
+
+            if (!module.CImportsByAlias.ContainsKey(parallel.Alias))
+            {
+                _diagnostics.Report("FLX0702", $"unknown C import alias '{parallel.Alias}'.", parallel.TargetLocation);
+                continue;
+            }
+
+            if (module.ParallelExternalCallsByName.ContainsKey(parallel.FullName))
+                continue;
+
+            var symbol = new ParallelExternalSymbol(parallel.Alias, parallel.Name, parallel.TargetLocation);
+            module.ParallelExternalCalls.Add(symbol);
+            module.ParallelExternalCallsByName.Add(symbol.FullName, symbol);
+        }
+    }
+
     private void BindFunctions(CompilationUnitSyntax unit, ModuleSymbol module, CompilationModel model, FunctionRegistry registry)
     {
         foreach (var function in unit.Functions)
@@ -347,7 +374,10 @@ internal sealed class SemanticAnalyzer
                     isExternal: true,
                     isExported: true)
                 {
-                    ReceiverType = function.ReceiverType
+                    ReceiverType = function.ReceiverType,
+                    ParallelInfo = function.Parallelizable
+                        ? FunctionParallelInfo.Parallel()
+                        : FunctionParallelInfo.Serial(function.ParallelReason ?? "external binary package function")
                 };
 
                 registry.TryAdd(symbol);
@@ -412,6 +442,63 @@ internal sealed class SemanticAnalyzer
                 }
             }
         }
+    }
+
+    private void AnalyzeFunctionParallelism(CompilationModel model)
+    {
+        foreach (var function in model.FunctionRegistry.AllFunctions)
+        {
+            if (function.IsExternal)
+                continue;
+
+            function.ParallelInfo = AnalyzeFunctionParallelism(function, model);
+        }
+    }
+
+    private static FunctionParallelInfo AnalyzeFunctionParallelism(FunctionSymbol function, CompilationModel model)
+    {
+        var body = function.Syntax.BodyText;
+        if (Regex.IsMatch(body, @"\bcreate\s+[A-Za-z_]", RegexOptions.Multiline))
+            return FunctionParallelInfo.Serial("function creates objects");
+
+        if (Regex.IsMatch(body, @"\bdestroy\s+[A-Za-z_]", RegexOptions.Multiline))
+            return FunctionParallelInfo.Serial("function destroys objects");
+
+        if (Regex.IsMatch(body, @"\breparent\s+[A-Za-z_]", RegexOptions.Multiline))
+            return FunctionParallelInfo.Serial("function reparents objects");
+
+        if (function.Parameters.Count != 1)
+            return FunctionParallelInfo.Serial("function does not have exactly one prefab parameter");
+
+        var receiverType = function.Parameters[0].Type;
+        if (!model.PrefabsByFullName.ContainsKey(receiverType))
+            return FunctionParallelInfo.Serial("function parameter is not a prefab");
+
+        var receiverName = Regex.Escape(function.Parameters[0].Name);
+        if (Regex.IsMatch(body, $@"\b{receiverName}\.[A-Za-z_][A-Za-z0-9_]*\s*=(?!=)", RegexOptions.Multiline))
+            return FunctionParallelInfo.Serial("function assigns prefab fields");
+
+        foreach (var global in model.GlobalsByFullName.Values)
+        {
+            if (Regex.IsMatch(body, $@"\b{Regex.Escape(global.Name)}\s*=(?!=)", RegexOptions.Multiline))
+                return FunctionParallelInfo.Serial($"function writes global '{global.FullName}'");
+        }
+
+        foreach (Match match in Regex.Matches(
+                     body,
+                     @"\b(?<alias>[A-Za-z_][A-Za-z0-9_]*)\.(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                     RegexOptions.Multiline))
+        {
+            var alias = match.Groups["alias"].Value;
+            if (!function.Module.CImportsByAlias.ContainsKey(alias))
+                continue;
+
+            var externalName = alias + "." + match.Groups["name"].Value;
+            if (!function.Module.ParallelExternalCallsByName.ContainsKey(externalName))
+                return FunctionParallelInfo.Serial($"calls external function '{externalName}' that is not marked parallel");
+        }
+
+        return FunctionParallelInfo.Parallel();
     }
 
     private string ResolveTypeName(string typeName, ModuleSymbol module, CompilationModel model, SourceLocation location)
@@ -585,7 +672,31 @@ internal sealed class SemanticAnalyzer
                     function.SourceFile,
                     function.Syntax.BodyStart,
                     _diagnostics);
+
+                CheckUnsupportedStringConcatenation(function);
             }
+        }
+    }
+
+    private void CheckUnsupportedStringConcatenation(FunctionSymbol function)
+    {
+        foreach (Match match in Regex.Matches(
+                     function.Syntax.BodyText,
+                     @"(?<target>[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<value>""(?:\\.|[^""\\])*""\s*\+[^;]+)\s*;",
+                     RegexOptions.Multiline))
+        {
+            var value = match.Groups["value"].Value;
+            var supported = Regex.IsMatch(
+                value,
+                @"^""(?:\\.|[^""\\])*""\s*\+\s*[A-Za-z_][A-Za-z0-9_]*$");
+            if (supported)
+                continue;
+
+            var location = function.SourceFile.GetLocation(function.Syntax.BodyStart + match.Groups["value"].Index);
+            _diagnostics.Report(
+                "FLX0703",
+                "unsupported string concatenation form; only string-literal + integer-variable is implemented.",
+                location);
         }
     }
 

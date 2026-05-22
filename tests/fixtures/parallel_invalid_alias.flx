@@ -1,0 +1,8 @@
+parallel stdiox.printf;
+
+void MainStep() {
+}
+
+schedule {
+    run MainStep;
+}

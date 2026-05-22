@@ -12,6 +12,7 @@ internal sealed class CompilationUnitSyntax
     public SourceFile Source { get; }
     public ModuleDeclSyntax? Module { get; set; }
     public List<CImportSyntax> CImports { get; } = [];
+    public List<ParallelExternalDeclSyntax> ParallelExternalCalls { get; } = [];
     public List<ComponentDeclSyntax> Components { get; } = [];
     public List<PrefabDeclSyntax> Prefabs { get; } = [];
     public List<GlobalVariableDeclSyntax> Globals { get; } = [];
@@ -43,6 +44,27 @@ internal sealed class CImportSyntax
     public string Header { get; }
     public string Alias { get; }
     public SourceLocation Location { get; }
+}
+
+internal sealed class ParallelExternalDeclSyntax
+{
+    public ParallelExternalDeclSyntax(
+        string alias,
+        string name,
+        SourceLocation declarationLocation,
+        SourceLocation targetLocation)
+    {
+        Alias = alias;
+        Name = name;
+        DeclarationLocation = declarationLocation;
+        TargetLocation = targetLocation;
+    }
+
+    public string Alias { get; }
+    public string Name { get; }
+    public string FullName => Alias + "." + Name;
+    public SourceLocation DeclarationLocation { get; }
+    public SourceLocation TargetLocation { get; }
 }
 
 internal sealed class FunctionDeclSyntax
