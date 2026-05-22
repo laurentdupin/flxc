@@ -25,5 +25,6 @@ internal enum TokenKind
     Comma,
     Semicolon,
     Dot,
-    Colon
+    Colon,
+    Star
 }

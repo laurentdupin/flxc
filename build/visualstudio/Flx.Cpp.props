@@ -19,4 +19,11 @@
 
     <FlxKeepGeneratedC Condition="'$(FlxKeepGeneratedC)' == ''">true</FlxKeepGeneratedC>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AvailableItemName Include="FlxCompile" />
+    <AvailableItemName Include="FlxPackage" />
+    <AvailableItemName Include="FlxSource" />
+    <AvailableItemName Include="FlxBinaryPackageReference" />
+  </ItemGroup>
 </Project>

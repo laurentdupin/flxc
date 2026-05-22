@@ -2,10 +2,17 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <BeforeBuildCompileTargets Condition="'$(FlxEnabled)' == 'true'">$(BeforeBuildCompileTargets);FlxGenerateC</BeforeBuildCompileTargets>
+    <FlxStampFile Condition="'$(FlxStampFile)' == ''">$(FlxGeneratedDir)\flx_generate.stamp</FlxStampFile>
+    <FlxPackageMetadata Condition="'$(FlxPackageMetadata)' == ''">$(FlxPackageOutputDir)\$(MSBuildProjectName).flxmeta.json</FlxPackageMetadata>
+    <FlxPublicIncludeDir Condition="'$(FlxPublicIncludeDir)' == ''">$(FlxPackageOutputDir)\include</FlxPublicIncludeDir>
+    <FlxCompilerOutputs Condition="'$(FlxCompilerOutputs)' == ''">$(FlxGeneratedList);$(FlxStampFile)</FlxCompilerOutputs>
+    <FlxCompilerOutputs Condition="'$(ConfigurationType)' == 'StaticLibrary' and '$(FlxCompilerOutputs)' == '$(FlxGeneratedList);$(FlxStampFile)'">$(FlxCompilerOutputs);$(FlxPackageMetadata)</FlxCompilerOutputs>
+    <FlxDisableFastUpToDateCheck Condition="'$(FlxDisableFastUpToDateCheck)' == ''">true</FlxDisableFastUpToDateCheck>
+    <DisableFastUpToDateCheck Condition="'$(FlxEnabled)' == 'true' and '$(FlxDisableFastUpToDateCheck)' == 'true'">true</DisableFastUpToDateCheck>
   </PropertyGroup>
 
   <Target
-    Name="FlxGenerateC"
+    Name="FlxValidateProjectItems"
     Condition="'$(FlxEnabled)' == 'true' and ('@(FlxCompile)' != '' or '@(FlxPackage)' != '')">
 
     <Error
@@ -19,25 +26,46 @@
     <Error
       Condition="'@(FlxPackage)' != '' and '@(FlxPackage->Count())' != '1'"
       Text="FLX project can contain only one FlxPackage item for now." />
+  </Target>
+
+  <ItemGroup Condition="'$(FlxEnabled)' == 'true'">
+    <FlxTrackedInput Include="@(FlxSource)" Condition="'@(FlxSource)' != ''" />
+    <FlxTrackedInput Include="@(None)" Condition="'@(None)' != ''" />
+    <FlxTrackedBinaryMetadata Include="@(FlxBinaryPackageReference->'%(MetadataPath)')" />
+    <FlxTrackedBinaryLibrary Include="@(FlxBinaryPackageReference->'%(Library)')" />
+
+    <UpToDateCheckInput Include="@(FlxCompile)" Condition="'@(FlxCompile)' != ''" />
+    <UpToDateCheckInput Include="@(FlxPackage)" Condition="'@(FlxPackage)' != ''" />
+    <UpToDateCheckInput Include="@(FlxTrackedInput)" Condition="'@(FlxTrackedInput)' != ''" />
+    <UpToDateCheckInput Include="@(FlxTrackedBinaryMetadata)" Condition="'@(FlxTrackedBinaryMetadata)' != ''" />
+    <UpToDateCheckInput Include="@(FlxTrackedBinaryLibrary)" Condition="'@(FlxTrackedBinaryLibrary)' != ''" />
+
+    <UpToDateCheckBuilt Include="$(FlxGeneratedList)" Condition="'@(FlxCompile)' != '' or '@(FlxPackage)' != ''" />
+    <UpToDateCheckBuilt Include="$(FlxStampFile)" Condition="'@(FlxCompile)' != '' or '@(FlxPackage)' != ''" />
+    <UpToDateCheckBuilt Include="$(FlxPackageMetadata)" Condition="'$(ConfigurationType)' == 'StaticLibrary' and '@(FlxPackage)' != ''" />
+  </ItemGroup>
+
+  <Target
+    Name="FlxRunCompiler"
+    DependsOnTargets="FlxValidateProjectItems"
+    Condition="'$(FlxEnabled)' == 'true' and ('@(FlxCompile)' != '' or '@(FlxPackage)' != '')"
+    Inputs="@(FlxCompile);@(FlxPackage);@(FlxTrackedInput);@(FlxTrackedBinaryMetadata);@(FlxTrackedBinaryLibrary)"
+    Outputs="$(FlxCompilerOutputs)">
 
     <MakeDir Directories="$(FlxGeneratedDir)" />
 
     <ItemGroup>
       <_FlxDefine Include="$(FlxPreprocessorDefinitions)" Condition="'$(FlxPreprocessorDefinitions)' != ''" />
       <_FlxIncludeDir Include="$(FlxAdditionalIncludeDirectories)" Condition="'$(FlxAdditionalIncludeDirectories)' != ''" />
-      <_FlxBinaryIncludeDir Include="@(FlxBinaryPackageReference->'%(IncludeDir)')" Condition="'%(FlxBinaryPackageReference.IncludeDir)' != ''" />
     </ItemGroup>
 
     <PropertyGroup>
-      <_FlxPackageMetadata Condition="'$(FlxPackageMetadata)' != ''">$(FlxPackageMetadata)</_FlxPackageMetadata>
-      <_FlxPackageMetadata Condition="'$(_FlxPackageMetadata)' == ''">$(FlxPackageOutputDir)\$(MSBuildProjectName).flxmeta.json</_FlxPackageMetadata>
-      <_FlxPublicIncludeDir Condition="'$(FlxPublicIncludeDir)' != ''">$(FlxPublicIncludeDir)</_FlxPublicIncludeDir>
-      <_FlxPublicIncludeDir Condition="'$(_FlxPublicIncludeDir)' == ''">$(FlxPackageOutputDir)\include</_FlxPublicIncludeDir>
-      <_FlxLibraryModeOptions Condition="'$(ConfigurationType)' == 'StaticLibrary'">--build-library --metadata-out &quot;$(_FlxPackageMetadata)&quot; --public-include-dir &quot;$(_FlxPublicIncludeDir)&quot;</_FlxLibraryModeOptions>
+      <_FlxLibraryModeOptions Condition="'$(ConfigurationType)' == 'StaticLibrary'">--build-library --metadata-out &quot;$(FlxPackageMetadata)&quot; --public-include-dir &quot;$(FlxPublicIncludeDir)&quot;</_FlxLibraryModeOptions>
     </PropertyGroup>
 
     <Message Text="FLX: package @(FlxPackage)" Importance="High" Condition="'@(FlxPackage)' != ''" />
     <Message Text="FLX: inputs @(FlxCompile)" Importance="High" Condition="'@(FlxCompile)' != ''" />
+    <Message Text="FLX: tracked project inputs @(FlxTrackedInput)" Importance="High" Condition="'@(FlxTrackedInput)' != ''" />
     <Message Text="FLX: generated C directory $(FlxGeneratedDir)" Importance="High" />
 
     <Exec
@@ -47,6 +75,22 @@
     <Exec
       Condition="'@(FlxCompile)' != ''"
       Command="&quot;$(FlxCompilerPath)&quot; @(FlxCompile->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+
+    <Touch Files="$(FlxStampFile)" AlwaysCreate="true" />
+  </Target>
+
+  <Target
+    Name="FlxGenerateC"
+    DependsOnTargets="FlxRunCompiler"
+    Condition="'$(FlxEnabled)' == 'true' and ('@(FlxCompile)' != '' or '@(FlxPackage)' != '')">
+
+    <Error
+      Condition="!Exists('$(FlxGeneratedList)')"
+      Text="FLX generated C list not found at '$(FlxGeneratedList)'. Rebuild the project or clean generated FLX output." />
+
+    <ItemGroup>
+      <_FlxBinaryIncludeDir Include="@(FlxBinaryPackageReference->'%(IncludeDir)')" Condition="'%(FlxBinaryPackageReference.IncludeDir)' != ''" />
+    </ItemGroup>
 
     <ReadLinesFromFile File="$(FlxGeneratedList)">
       <Output TaskParameter="Lines" ItemName="FlxGeneratedC" />
@@ -64,5 +108,6 @@
 
   <Target Name="FlxClean" BeforeTargets="Clean" Condition="'$(FlxEnabled)' == 'true'">
     <RemoveDir Directories="$(FlxGeneratedDir)" Condition="Exists('$(FlxGeneratedDir)')" />
+    <RemoveDir Directories="$(FlxPackageOutputDir)" Condition="'$(ConfigurationType)' == 'StaticLibrary' and Exists('$(FlxPackageOutputDir)')" />
   </Target>
 </Project>

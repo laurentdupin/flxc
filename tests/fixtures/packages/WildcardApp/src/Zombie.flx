@@ -1,0 +1,4 @@
+module game.zombies;
+
+void Update() {
+}

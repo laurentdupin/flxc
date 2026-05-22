@@ -2,7 +2,6 @@ module zombies.greeting;
 
 import c "stdio.h" as stdio
 
-export void SayHello(zombies.Zombie z) {
+export void SayHello(Zombie z) {
     stdio.printf("Hello %s\n", z.name.c_str());
-    z.SayHello();
 }

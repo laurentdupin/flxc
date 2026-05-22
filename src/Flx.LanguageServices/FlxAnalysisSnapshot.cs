@@ -89,9 +89,18 @@ public sealed class FlxAnalysisSnapshot
         if (reference is null)
             return null;
 
-        return _definitionsByKey.TryGetValue(reference.TargetKey, out var definition)
-            ? new FlxDefinitionResult(definition.Path, definition.Range)
-            : null;
+        var locations = reference.EffectiveTargetKeys
+            .Select(key => _definitionsByKey.TryGetValue(key, out var definition) ? definition : null)
+            .Where(definition => definition is not null)
+            .Select(definition => new FlxDefinitionLocation(definition!.Path, definition.Range))
+            .DistinctBy(location => Path.GetFullPath(location.Path) + "\u001f" +
+                                    location.Range.Start.Line + "\u001f" +
+                                    location.Range.Start.Character + "\u001f" +
+                                    location.Range.End.Line + "\u001f" +
+                                    location.Range.End.Character)
+            .ToArray();
+
+        return locations.Length == 0 ? null : new FlxDefinitionResult(locations);
     }
 
     public FlxHoverResult? GetHover(string path, int line, int character)
@@ -99,7 +108,15 @@ public sealed class FlxAnalysisSnapshot
         var fullPath = Path.GetFullPath(path);
         var reference = FindReference(fullPath, line, character, includeSameLineFallback: false);
         if (reference is not null &&
-            _symbolInfosByKey.TryGetValue(reference.TargetKey, out var info))
+            reference.Kind == FlxReferenceKind.ScheduleRunTarget &&
+            reference.TargetFullName.Contains('*', StringComparison.Ordinal))
+        {
+            return new FlxHoverResult(FormatWildcardScheduleHover(reference), reference.Range);
+        }
+
+        if (reference is not null &&
+            reference.EffectiveTargetKeys.Count > 0 &&
+            _symbolInfosByKey.TryGetValue(reference.EffectiveTargetKeys[0], out var info))
         {
             return new FlxHoverResult(FormatHover(info), reference.Range);
         }
@@ -125,7 +142,9 @@ public sealed class FlxAnalysisSnapshot
         }
 
         if (IsScheduleRunContext(beforeCursor))
-            return UniqueCompletionItems(GetSymbolCompletions(onlyFunctions: true));
+            return UniqueCompletionItems(
+                new[] { new FlxCompletionItem("*", FlxCompletionKind.Keyword, "Wildcard schedule target segment") }
+                    .Concat(GetSymbolCompletions(onlyFunctions: true)));
 
         return UniqueCompletionItems(
             KeywordCompletions
@@ -226,6 +245,32 @@ public sealed class FlxAnalysisSnapshot
 
         if (!string.IsNullOrWhiteSpace(info.ModuleName))
             lines.Add($"module {info.ModuleName}");
+
+        return string.Join("\n", lines);
+    }
+
+    private static string FormatWildcardScheduleHover(FlxReference reference)
+    {
+        var matches = reference.EffectiveTargetFullNames
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        var lines = new List<string>
+        {
+            "```flx",
+            $"wildcard schedule target {reference.TargetFullName}",
+            "```"
+        };
+
+        if (matches.Length == 0)
+            return string.Join("\n", lines);
+
+        lines.Add(matches.Length == 1 ? "matches 1 function group:" : $"matches {matches.Length} function groups:");
+        foreach (var match in matches.Take(10))
+            lines.Add($"- {match}");
+
+        if (matches.Length > 10)
+            lines.Add($"- ... {matches.Length - 10} more");
 
         return string.Join("\n", lines);
     }

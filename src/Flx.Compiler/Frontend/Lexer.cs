@@ -67,6 +67,7 @@ internal sealed class Lexer
             ';' => new Token(TokenKind.Semicolon, ";", null, start, _position, location),
             '.' => new Token(TokenKind.Dot, ".", null, start, _position, location),
             ':' => new Token(TokenKind.Colon, ":", null, start, _position, location),
+            '*' => new Token(TokenKind.Star, "*", null, start, _position, location),
             _ => UnknownToken(current, start, location)
         };
     }

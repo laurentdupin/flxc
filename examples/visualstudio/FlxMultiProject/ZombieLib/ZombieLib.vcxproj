@@ -79,8 +79,8 @@
 
   <ItemGroup>
     <FlxPackage Include="flx.package.json" />
-    <None Include="src\Zombie.flx" />
-    <None Include="src\ZombieGreeting.flx" />
+    <FlxSource Include="src\Zombie.flx" />
+    <FlxSource Include="src\ZombieGreeting.flx" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

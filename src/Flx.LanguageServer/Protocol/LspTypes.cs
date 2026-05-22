@@ -19,6 +19,7 @@ internal static class TextDocumentSyncKind
 internal static class DiagnosticSeverity
 {
     public const int Error = 1;
+    public const int Warning = 2;
 }
 
 internal static class SymbolKind
@@ -172,6 +173,9 @@ internal static class LspTypeConversions
         return new LspDiagnostic
         {
             Range = new LspRange(start, end),
+            Severity = diagnostic.Severity == FlxDiagnosticSeverity.Warning
+                ? DiagnosticSeverity.Warning
+                : DiagnosticSeverity.Error,
             Code = diagnostic.Id,
             Message = diagnostic.Message
         };
@@ -192,6 +196,11 @@ internal static class LspTypeConversions
     }
 
     public static LspLocation ToLspLocation(FlxDefinitionResult definition)
+    {
+        return ToLspLocation(definition.Locations[0]);
+    }
+
+    public static LspLocation ToLspLocation(FlxDefinitionLocation definition)
     {
         return new LspLocation
         {

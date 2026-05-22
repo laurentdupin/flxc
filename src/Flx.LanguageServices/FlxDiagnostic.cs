@@ -1,8 +1,21 @@
 namespace Flx.LanguageServices;
 
+public enum FlxDiagnosticSeverity
+{
+    Error,
+    Warning
+}
+
 public sealed class FlxDiagnostic
 {
-    public FlxDiagnostic(string id, string message, string? path, int line, int character, int position)
+    public FlxDiagnostic(
+        string id,
+        string message,
+        string? path,
+        int line,
+        int character,
+        int position,
+        FlxDiagnosticSeverity severity = FlxDiagnosticSeverity.Error)
     {
         Id = id;
         Message = message;
@@ -10,6 +23,7 @@ public sealed class FlxDiagnostic
         Line = line;
         Character = character;
         Position = position;
+        Severity = severity;
     }
 
     public string Id { get; }
@@ -23,4 +37,5 @@ public sealed class FlxDiagnostic
     public int Character { get; }
 
     public int Position { get; }
+    public FlxDiagnosticSeverity Severity { get; }
 }

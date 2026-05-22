@@ -385,31 +385,43 @@ public sealed class FlxWorkspace
         {
             foreach (var component in package.Metadata.Symbols.Components)
             {
-                definitions[ComponentKey(component.FullName)] = CreateMetadataDefinition(
+                definitions[ComponentKey(component.FullName)] = CreateBinaryPackageDefinition(
+                    package,
                     ComponentKey(component.FullName),
                     component.FullName,
                     FlxSymbolKind.Component,
-                    package.MetadataPath,
+                    component.Source,
+                    component.Line,
+                    component.Column,
+                    component.Name,
                     component.FullName);
             }
 
             foreach (var prefab in package.Metadata.Symbols.Prefabs)
             {
-                definitions[PrefabKey(prefab.FullName)] = CreateMetadataDefinition(
+                definitions[PrefabKey(prefab.FullName)] = CreateBinaryPackageDefinition(
+                    package,
                     PrefabKey(prefab.FullName),
                     prefab.FullName,
                     FlxSymbolKind.Prefab,
-                    package.MetadataPath,
+                    prefab.Source,
+                    prefab.Line,
+                    prefab.Column,
+                    prefab.Name,
                     prefab.FullName);
             }
 
             foreach (var function in package.Metadata.Symbols.Functions)
             {
-                definitions["function:" + function.MangledName] = CreateMetadataDefinition(
+                definitions["function:" + function.MangledName] = CreateBinaryPackageDefinition(
+                    package,
                     "function:" + function.MangledName,
                     function.FullName,
                     function.ReceiverType is null ? FlxSymbolKind.Function : FlxSymbolKind.Method,
-                    package.MetadataPath,
+                    function.Source,
+                    function.Line,
+                    function.Column,
+                    function.SourceName,
                     function.FullName);
             }
         }
@@ -507,7 +519,7 @@ public sealed class FlxWorkspace
                         new ComponentFieldSymbol(field.Type, field.Name, field.DefaultValue, default)).ToArray()),
                     PackageName = package.Name,
                     ModuleName = ModuleNameFromFullName(component.FullName, component.Name),
-                    SourcePath = package.MetadataPath
+                    SourcePath = ResolveBinaryPackageSourcePath(package, component.Source) ?? package.MetadataPath
                 };
             }
 
@@ -524,7 +536,7 @@ public sealed class FlxWorkspace
                         : "flattens " + string.Join(", ", prefab.FlattenedComponents),
                     PackageName = package.Name,
                     ModuleName = ModuleNameFromFullName(prefab.FullName, prefab.Name),
-                    SourcePath = package.MetadataPath
+                    SourcePath = ResolveBinaryPackageSourcePath(package, prefab.Source) ?? package.MetadataPath
                 };
             }
 
@@ -540,7 +552,7 @@ public sealed class FlxWorkspace
                     Detail = function.ReceiverType is null ? null : $"receiver {function.ReceiverType}",
                     PackageName = package.Name,
                     ModuleName = ModuleNameFromFullName(function.FullName, function.SourceName),
-                    SourcePath = package.MetadataPath
+                    SourcePath = ResolveBinaryPackageSourcePath(package, function.Source) ?? package.MetadataPath
                 };
             }
         }
@@ -757,18 +769,37 @@ public sealed class FlxWorkspace
         {
             foreach (var runStep in schedule.Steps.OfType<RunStepSyntax>())
             {
-                var functions = model.FunctionRegistry.ResolveFunctionGroup(runStep.Name, module, out var ambiguous);
-                if (ambiguous || functions.Count != 1)
+                var resolution = ScheduleTargetResolver.Resolve(model, runStep, module);
+                if (resolution.IsAmbiguous || resolution.Functions.Count == 0)
                     continue;
 
-                var target = functions[0];
-                references.Add(CreateReference(
+                var targetGroups = resolution.Functions
+                    .GroupBy(function => function.FullName, StringComparer.Ordinal)
+                    .OrderBy(group => group.Key, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .ToArray();
+
+                if (!runStep.Target.HasWildcard && targetGroups.Length == 1)
+                {
+                    var target = targetGroups[0];
+                    references.Add(CreateReference(
+                        module.SourceFile.FullPath,
+                        RangeFromLocation(runStep.Location, runStep.Name.Length),
+                        FlxReferenceKind.ScheduleRunTarget,
+                        FunctionKey(target),
+                        target.FullName,
+                        target.ReceiverType is null ? FlxSymbolKind.Function : FlxSymbolKind.Method));
+                    continue;
+                }
+
+                references.Add(CreateMultiReference(
                     module.SourceFile.FullPath,
                     RangeFromLocation(runStep.Location, runStep.Name.Length),
                     FlxReferenceKind.ScheduleRunTarget,
-                    FunctionKey(target),
-                    target.FullName,
-                    target.ReceiverType is null ? FlxSymbolKind.Function : FlxSymbolKind.Method));
+                    runStep.Name,
+                    targetGroups.Select(FunctionKey).ToArray(),
+                    targetGroups.Select(function => function.FullName).ToArray(),
+                    FlxSymbolKind.Function));
             }
         }
     }
@@ -1051,6 +1082,68 @@ public sealed class FlxWorkspace
         };
     }
 
+    private static FlxSymbolDefinition CreateBinaryPackageDefinition(
+        LoadedBinaryPackage package,
+        string key,
+        string fullName,
+        FlxSymbolKind kind,
+        string? source,
+        int line,
+        int column,
+        string sourceName,
+        string metadataSearchText)
+    {
+        var sourcePath = ResolveBinaryPackageSourcePath(package, source);
+        if (!string.IsNullOrWhiteSpace(sourcePath) && File.Exists(sourcePath))
+        {
+            FlxRange? range = line > 0 && column > 0
+                ? RangeFromLocation(new SourceLocation(sourcePath, line, column, 0), sourceName.Length)
+                : FindTextRangeInFile(sourcePath, sourceName);
+
+            if (range is not null)
+            {
+                return new FlxSymbolDefinition
+                {
+                    Key = key,
+                    FullName = fullName,
+                    Kind = kind,
+                    Path = Path.GetFullPath(sourcePath),
+                    Range = range.Value
+                };
+            }
+        }
+
+        return CreateMetadataDefinition(
+            key,
+            fullName,
+            kind,
+            package.MetadataPath,
+            metadataSearchText);
+    }
+
+    private static string? ResolveBinaryPackageSourcePath(LoadedBinaryPackage package, string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+
+        if (Path.IsPathRooted(source))
+            return Path.GetFullPath(source);
+
+        var metadataDirectory = Path.GetDirectoryName(Path.GetFullPath(package.MetadataPath)) ??
+                                Directory.GetCurrentDirectory();
+
+        if (!string.IsNullOrWhiteSpace(package.Metadata.SourceRoot))
+        {
+            var sourceRoot = Path.IsPathRooted(package.Metadata.SourceRoot)
+                ? package.Metadata.SourceRoot
+                : Path.Combine(metadataDirectory, package.Metadata.SourceRoot);
+
+            return Path.GetFullPath(Path.Combine(sourceRoot, source));
+        }
+
+        return Path.GetFullPath(Path.Combine(metadataDirectory, source));
+    }
+
     private static FlxRange? FindTextRangeInFile(string path, string searchText)
     {
         if (!File.Exists(path))
@@ -1081,6 +1174,27 @@ public sealed class FlxWorkspace
             TargetKey = targetKey,
             TargetFullName = targetFullName,
             TargetKind = targetKind
+        };
+    }
+
+    private static FlxReference CreateMultiReference(
+        string path,
+        FlxRange range,
+        FlxReferenceKind kind,
+        string displayName,
+        IReadOnlyList<string> targetKeys,
+        IReadOnlyList<string> targetFullNames,
+        FlxSymbolKind targetKind)
+    {
+        return new FlxReference
+        {
+            Path = path,
+            Range = range,
+            Kind = kind,
+            TargetFullName = displayName,
+            TargetKind = targetKind,
+            TargetKeys = targetKeys,
+            TargetFullNames = targetFullNames
         };
     }
 
@@ -1141,7 +1255,7 @@ public sealed class FlxWorkspace
     private static FlxDiagnostic ConvertDiagnostic(Diagnostic diagnostic)
     {
         if (diagnostic.Location is not { } location)
-            return new FlxDiagnostic(diagnostic.Id, diagnostic.Message, null, 0, 0, 0);
+            return new FlxDiagnostic(diagnostic.Id, diagnostic.Message, null, 0, 0, 0, ConvertSeverity(diagnostic.Severity));
 
         return new FlxDiagnostic(
             diagnostic.Id,
@@ -1149,7 +1263,15 @@ public sealed class FlxWorkspace
             location.FilePath,
             Math.Max(0, location.Line - 1),
             Math.Max(0, location.Column - 1),
-            location.Position);
+            location.Position,
+            ConvertSeverity(diagnostic.Severity));
+    }
+
+    private static FlxDiagnosticSeverity ConvertSeverity(Flx.Compiler.Diagnostics.DiagnosticSeverity severity)
+    {
+        return severity == Flx.Compiler.Diagnostics.DiagnosticSeverity.Warning
+            ? FlxDiagnosticSeverity.Warning
+            : FlxDiagnosticSeverity.Error;
     }
 
     private static FlxPosition ToPosition(SourceLocation location)

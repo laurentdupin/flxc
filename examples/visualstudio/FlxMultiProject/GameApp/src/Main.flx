@@ -1,11 +1,16 @@
 module app;
 
 void CreateZombies() {
-    zombies.Zombie z = create zombies.Zombie;
-    z.name = "Marcus";
+
+    Array<string> names = ["Marcus", "Louis"];
+
+    for (i32 i = 0; i < names.length(); ++i){
+        Zombie z = create Zombie;
+        z.name = names[i];
+    }
 }
 
-void Greet(zombies.Zombie z) {
+void Greet(Zombie z) {
     z.SayHello();
 }
 

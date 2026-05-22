@@ -16,7 +16,7 @@ internal static class MetadataWriter
         WriteIndented = true
     };
 
-    public static async Task WriteAsync(ModuleSymbol module, string cFilePath, string metadataPath)
+    public static async Task WriteAsync(ModuleSymbol module, CompilationModel model, string cFilePath, string metadataPath)
     {
         var metadata = new ModuleMetadata
         {
@@ -67,7 +67,7 @@ internal static class MetadataWriter
         {
             metadata.Schedule = new ScheduleMetadata
             {
-                Steps = module.Syntax.Schedules.SelectMany(schedule => schedule.Steps).Select(ToMetadataStep).ToList()
+                Steps = module.Syntax.Schedules.SelectMany(schedule => schedule.Steps).Select(step => ToMetadataStep(step, model, module)).ToList()
             };
         }
 
@@ -75,14 +75,27 @@ internal static class MetadataWriter
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, JsonOptions));
     }
 
-    private static ScheduleStepMetadata ToMetadataStep(ScheduleStmtSyntax step)
+    private static ScheduleStepMetadata ToMetadataStep(ScheduleStmtSyntax step, CompilationModel model, ModuleSymbol module)
     {
         return step switch
         {
-            RunStepSyntax run => new ScheduleStepMetadata { Kind = "run", Name = run.Name },
+            RunStepSyntax run => ToRunMetadataStep(run, model, module),
             LabelStepSyntax label => new ScheduleStepMetadata { Kind = "label", Name = label.Name },
             LoopToStepSyntax loopTo => new ScheduleStepMetadata { Kind = "loopto", Name = loopTo.TargetLabel },
             _ => new ScheduleStepMetadata { Kind = "unknown", Name = "" }
+        };
+    }
+
+    private static ScheduleStepMetadata ToRunMetadataStep(RunStepSyntax run, CompilationModel model, ModuleSymbol module)
+    {
+        var resolution = ScheduleTargetResolver.Resolve(model, run, module);
+        return new ScheduleStepMetadata
+        {
+            Kind = "run",
+            Name = run.Name,
+            Target = run.Name,
+            IsWildcard = run.Target.HasWildcard,
+            ExpandedTargets = resolution.FunctionGroupFullNames.ToList()
         };
     }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "WildcardApp",
+  "type": "exe",
+  "sources": [
+    "src/**/*.flx"
+  ],
+  "dependencies": [],
+  "cIncludeDirs": [],
+  "cLibraries": [],
+  "defines": []
+}

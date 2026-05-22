@@ -232,7 +232,7 @@ internal sealed class Parser
             {
                 Advance();
                 var location = Current.Location;
-                var target = ParseQualifiedName("expected run target name.");
+                var target = ParseScheduleTarget("expected run target name.");
                 steps.Add(new RunStepSyntax(target, location));
                 Expect(TokenKind.Semicolon, "expected ';' after run statement.");
                 continue;
@@ -276,6 +276,14 @@ internal sealed class Parser
             while (Current.Kind == TokenKind.Dot)
             {
                 Advance();
+                if (Current.Kind == TokenKind.Star)
+                {
+                    _diagnostics.Report("FLX0409", "wildcard names are only allowed in schedule targets.", Current.Location);
+                    Advance();
+                    name += ".*";
+                    continue;
+                }
+
                 var next = ExpectIdentifier("expected identifier after '.'.");
                 name += "." + next.Text;
             }
@@ -304,11 +312,47 @@ internal sealed class Parser
         while (Current.Kind == TokenKind.Dot)
         {
             Advance();
+            if (Current.Kind == TokenKind.Star)
+            {
+                _diagnostics.Report("FLX0409", "wildcard names are only allowed in schedule targets.", Current.Location);
+                Advance();
+                result += ".*";
+                continue;
+            }
+
             var next = ExpectIdentifier("expected identifier after '.'.");
             result += "." + next.Text;
         }
 
         return result;
+    }
+
+    private ScheduleTargetSyntax ParseScheduleTarget(string message)
+    {
+        var segments = new List<ScheduleTargetSegmentSyntax>
+        {
+            ParseScheduleTargetSegment(message)
+        };
+
+        while (Current.Kind == TokenKind.Dot)
+        {
+            Advance();
+            segments.Add(ParseScheduleTargetSegment("expected identifier or '*' after '.'."));
+        }
+
+        return new ScheduleTargetSyntax(segments);
+    }
+
+    private ScheduleTargetSegmentSyntax ParseScheduleTargetSegment(string message)
+    {
+        if (Current.Kind == TokenKind.Star)
+        {
+            Advance();
+            return new ScheduleTargetSegmentSyntax("*", isWildcard: true);
+        }
+
+        var identifier = ExpectIdentifier(message);
+        return new ScheduleTargetSegmentSyntax(identifier.Text, isWildcard: false);
     }
 
     private void ExpectUnknown(string text, string message)

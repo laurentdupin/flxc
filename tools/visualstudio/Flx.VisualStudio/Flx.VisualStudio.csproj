@@ -11,15 +11,18 @@
     <TargetVsixContainerName>$(TargetName).vsix</TargetVsixContainerName>
     <TargetVsixContainer>$(OutDir)$(TargetVsixContainerName)</TargetVsixContainer>
     <GeneratePkgDefFile>false</GeneratePkgDefFile>
-    <IncludeAssemblyInVSIXContainer>false</IncludeAssemblyInVSIXContainer>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
     <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
     <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
     <VsixType>v3</VsixType>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.14.60" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +48,30 @@
   </ItemGroup>
 
   <Import Project="$(PkgMicrosoft_VSSDK_BuildTools)\tools\vssdk\Microsoft.VsSDK.targets" Condition="Exists('$(PkgMicrosoft_VSSDK_BuildTools)\tools\vssdk\Microsoft.VsSDK.targets')" />
+
+  <PropertyGroup>
+    <DetokenizeVsixManifestFileDependsOn>FlxRefreshVsixManifest;$(DetokenizeVsixManifestFileDependsOn)</DetokenizeVsixManifestFileDependsOn>
+  </PropertyGroup>
+
+  <Target Name="FlxRefreshVsixManifest">
+    <Delete Files="$(IntermediateVsixManifest)" />
+  </Target>
+
+  <PropertyGroup>
+    <GetVsixSourceItemsDependsOn>PublishFlxLanguageServerForVsix;$(GetVsixSourceItemsDependsOn)</GetVsixSourceItemsDependsOn>
+  </PropertyGroup>
+
+  <Target Name="PublishFlxLanguageServerForVsix">
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\..\..\src\Flx.LanguageServer\Flx.LanguageServer.csproj&quot; -c Release -o &quot;$(MSBuildProjectDirectory)\server-bundle&quot;" />
+    <ItemGroup>
+      <Content Include="$(MSBuildProjectDirectory)\server-bundle\**\*"
+               Exclude="$(MSBuildProjectDirectory)\server-bundle\**\*.pdb;$(MSBuildProjectDirectory)\server-bundle\**\*.xml">
+        <Link>server-bundle\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
 
   <Target Name="FlxCreateVsixAfterBuild" AfterTargets="Build" DependsOnTargets="CreateVsixContainer" Condition="'$(CreateVsixContainer)' == 'true'" />
 </Project>

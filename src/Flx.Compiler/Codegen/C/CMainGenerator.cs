@@ -96,13 +96,19 @@ internal sealed class CMainGenerator
 
     private static IEnumerable<FunctionSymbol> ResolveRun(CompilationModel model, RunStepSyntax step)
     {
-        return model.FunctionRegistry
-            .ResolveFunctionGroup(step.Name, model.ScheduleModule, out _)
+        var resolution = ScheduleTargetResolver.Resolve(model, step, model.ScheduleModule);
+        var functions = resolution.Functions
             .Where(function => function.Parameters.Count == 0 ||
-                               (function.Parameters.Count == 1 && model.PrefabsByFullName.ContainsKey(function.Parameters[0].Type)))
-            .OrderBy(function => function.SourceFile.DisplayPath, StringComparer.Ordinal)
-            .ThenBy(function => function.Location.Line)
-            .ThenBy(function => function.MangledName, StringComparer.Ordinal);
+                               (function.Parameters.Count == 1 && model.PrefabsByFullName.ContainsKey(function.Parameters[0].Type)));
+
+        return resolution.IsWildcard
+            ? functions
+                .OrderBy(function => function.FullName, StringComparer.Ordinal)
+                .ThenBy(function => function.MangledName, StringComparer.Ordinal)
+            : functions
+                .OrderBy(function => function.SourceFile.DisplayPath, StringComparer.Ordinal)
+                .ThenBy(function => function.Location.Line)
+                .ThenBy(function => function.MangledName, StringComparer.Ordinal);
     }
 
     private static void AppendScheduleCall(StringBuilder builder, FunctionSymbol function, CompilationModel model)

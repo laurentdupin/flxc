@@ -1,6 +1,6 @@
 # FLX Language Support for VS Code
 
-This extension provides syntax highlighting and starts `flx-lsp` for FLX diagnostics and document symbols.
+This extension provides syntax highlighting and starts `flx-lsp` for FLX language features.
 
 It contributes:
 
@@ -12,6 +12,9 @@ It contributes:
 - basic indentation rules
 - diagnostics through `flx-lsp`
 - document symbols through `flx-lsp`
+- hover through `flx-lsp`
+- go to definition through `flx-lsp`
+- completion through `flx-lsp`
 
 The grammar and language configuration are copied from the shared source files in:
 
@@ -54,16 +57,16 @@ npm install
 npm run package
 ```
 
-This publishes `flx-lsp` into `server/` and creates:
+This publishes `flx-lsp` into `server-bundle/` and creates:
 
 ```text
-flx-language-0.0.1.vsix
+flx-language-0.3.0.vsix
 ```
 
 Install it in VS Code:
 
 ```powershell
-code --install-extension .\flx-language-0.0.1.vsix
+code --install-extension .\flx-language-0.3.0.vsix
 ```
 
 After that, opening `.flx` files should use the packaged language server automatically.
@@ -86,6 +89,6 @@ Optional server logging:
 
 ## Limitations
 
-- no completion
-- no hover
-- no go to definition
+- no rename
+- no find references
+- no formatting

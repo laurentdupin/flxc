@@ -45,10 +45,11 @@ Or use package mode:
 ```xml
 <ItemGroup>
   <FlxPackage Include="flx.package.json" />
+  <FlxSource Include="src\Main.flx" />
 </ItemGroup>
 ```
 
-For now, a project may use either `FlxPackage` or `FlxCompile`, not both. Package mode supports one package manifest item per C++ project.
+For now, a project may use either `FlxPackage` or `FlxCompile`, not both. Package mode supports one package manifest item per C++ project. In package mode, list the package's `.flx` files as `FlxSource` items. The package manifest remains the compiler input, but `FlxSource` makes source edits visible to Visual Studio and MSBuild incremental checks.
 
 Static-library package projects are supported by setting the normal C++ project type:
 
@@ -70,12 +71,14 @@ An executable project can consume an already-built FLX library with a package ma
 ```xml
 <ItemGroup>
   <FlxBinaryPackageReference Include="ZombieLib">
+    <MetadataPath>..\flx\ZombieLib\ZombieLib.flxmeta.json</MetadataPath>
     <IncludeDir>..\flx\ZombieLib\include</IncludeDir>
+    <Library>..\$(Platform)\$(Configuration)\ZombieLib.lib</Library>
   </FlxBinaryPackageReference>
 </ItemGroup>
 ```
 
-The `FlxBinaryPackageReference` include directory is attached to generated C compilation. Link the `.lib` through a normal C++ `ProjectReference` when the library is in the same solution, or through standard C++ linker settings when it is external.
+The `FlxBinaryPackageReference` include directory is attached to generated C compilation. `MetadataPath` and `Library` are tracked as build inputs so executable projects regenerate/relink after a referenced FLX library changes. Link the `.lib` through a normal C++ `ProjectReference` when the library is in the same solution, or through standard C++ linker settings when it is external.
 
 Useful project properties:
 
@@ -90,12 +93,12 @@ Useful project properties:
 
 ## Limitations
 
-- No FLX IntelliSense or VSIX yet.
+- Editor support is provided separately by the FLX VSIX; this folder only owns the MSBuild/C++ project integration.
 - Debugging is native C-level. `#line` directives give best-effort mapping back to `.flx`.
 - Generated C is kept under `$(IntDir)\flx`.
-- Incremental generation is intentionally simple for now; FLX C is regenerated before C compilation.
+- Visual Studio fast up-to-date checks are disabled for FLX projects by default so source changes cannot be skipped before MSBuild runs. The MSBuild target then uses `FlxCompile`, `FlxPackage`, `FlxSource`, tracked dependency manifests, and binary package metadata/library inputs to decide whether `flxc` itself needs to rerun.
 
-For basic `.flx` syntax coloring, comments, bracket matching, and indentation, see:
+For `.flx` editor support, see:
 
 ```text
 tools\visualstudio\Flx.VisualStudio

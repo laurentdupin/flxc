@@ -18,8 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="src\Main.flx">
+    <FlxSource Include="src\Main.flx">
       <Filter>FLX Source Files</Filter>
-    </None>
+    </FlxSource>
   </ItemGroup>
 </Project>

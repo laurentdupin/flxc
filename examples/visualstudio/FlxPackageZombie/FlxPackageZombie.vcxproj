@@ -79,10 +79,10 @@
 
   <ItemGroup>
     <FlxPackage Include="flx.package.json" />
-    <None Include="src\Main.flx" />
+    <FlxSource Include="src\Main.flx" />
     <None Include="libs\ZombieLib\flx.package.json" />
-    <None Include="libs\ZombieLib\src\Zombie.flx" />
-    <None Include="libs\ZombieLib\src\ZombieGreeting.flx" />
+    <FlxSource Include="libs\ZombieLib\src\Zombie.flx" />
+    <FlxSource Include="libs\ZombieLib\src\ZombieGreeting.flx" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -18,11 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="src\Zombie.flx">
+    <FlxSource Include="src\Zombie.flx">
       <Filter>FLX Source Files</Filter>
-    </None>
-    <None Include="src\ZombieGreeting.flx">
+    </FlxSource>
+    <FlxSource Include="src\ZombieGreeting.flx">
       <Filter>FLX Source Files</Filter>
-    </None>
+    </FlxSource>
   </ItemGroup>
 </Project>

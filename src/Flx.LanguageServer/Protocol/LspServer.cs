@@ -206,11 +206,17 @@ internal sealed class LspServer
         var path = UriToPath(parameters.TextDocument.Uri);
         var snapshot = Analyze(path);
         var definition = snapshot.FindDefinition(path, parameters.Position.Line, parameters.Position.Character);
-        var result = definition is null || !File.Exists(definition.Path)
+        var locations = definition?.Locations
+            .Where(location => File.Exists(location.Path))
+            .Select(LspTypeConversions.ToLspLocation)
+            .ToArray();
+        object? result = locations is null || locations.Length == 0
             ? null
-            : LspTypeConversions.ToLspLocation(definition);
+            : locations.Length == 1
+                ? locations[0]
+                : locations;
 
-        await LogAsync($"definition {path}:{parameters.Position.Line}:{parameters.Position.Character}: {(result is null ? "none" : definition!.Path)}");
+        await LogAsync($"definition {path}:{parameters.Position.Line}:{parameters.Position.Character}: {(locations is null || locations.Length == 0 ? "none" : string.Join(", ", locations.Select(location => UriToPath(location.Uri))))}");
         await SendResultAsync(connection, id, result, cancellationToken);
     }
 
@@ -324,7 +330,7 @@ internal sealed class LspServer
             serverInfo = new
             {
                 name = "flx-lsp",
-                version = "0.1.0"
+                version = "0.3.0"
             }
         };
     }

@@ -11,6 +11,7 @@ internal sealed class PackageMetadata
     public string FlxCompilerVersion { get; set; } = "";
     public string RuntimeAbi { get; set; } = "";
     public string AbiHash { get; set; } = "";
+    public string SourceRoot { get; set; } = "";
     public List<string> Headers { get; set; } = [];
     public PackageSymbolsMetadata Symbols { get; set; } = new();
     public List<string> HiddenSymbols { get; set; } = [];

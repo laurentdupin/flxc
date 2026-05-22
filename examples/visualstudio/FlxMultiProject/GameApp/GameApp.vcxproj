@@ -80,9 +80,11 @@
   <ItemGroup>
     <FlxPackage Include="flx.package.json" />
     <FlxBinaryPackageReference Include="ZombieLib">
+      <MetadataPath>..\flx\ZombieLib\ZombieLib.flxmeta.json</MetadataPath>
       <IncludeDir>..\flx\ZombieLib\include</IncludeDir>
+      <Library>..\$(Platform)\$(Configuration)\ZombieLib.lib</Library>
     </FlxBinaryPackageReference>
-    <None Include="src\Main.flx" />
+    <FlxSource Include="src\Main.flx" />
   </ItemGroup>
 
   <ItemGroup>

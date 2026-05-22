@@ -91,6 +91,9 @@ internal sealed class BuildDriver
             return 1;
         }
 
+        if (diagnostics.HasWarnings)
+            diagnostics.PrintWarningsTo(error);
+
         var generation = await GenerateAsync(model, options, packageGraph, outputDirectory, shouldDeleteDirectory);
 
         if (options.EmitC)
@@ -317,7 +320,7 @@ internal sealed class BuildDriver
             generatedSources.Add(cPath);
 
             var metadataPath = Path.Combine(outputDirectory, GeneratedRelativePath(module.SourceFile, ".meta.json", usedNames));
-            await MetadataWriter.WriteAsync(module, cPath, metadataPath);
+            await MetadataWriter.WriteAsync(module, model, cPath, metadataPath);
         }
 
         string? mainSource = null;

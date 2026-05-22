@@ -493,20 +493,26 @@ internal sealed class SemanticAnalyzer
 
             var runStep = (RunStepSyntax)step;
             var scheduleModule = model.ScheduleModule;
-            var overloads = model.FunctionRegistry.ResolveFunctionGroup(runStep.Name, scheduleModule, out var ambiguous);
-            if (ambiguous)
+            var resolution = ScheduleTargetResolver.Resolve(model, runStep, scheduleModule);
+            if (resolution.IsAmbiguous)
             {
-                _diagnostics.Report("FLX0406", $"schedule target '{runStep.Name}' is ambiguous.", runStep.Location);
+                var candidates = resolution.CandidateFullNames.Count == 0
+                    ? ""
+                    : " candidates: " + string.Join(", ", resolution.CandidateFullNames);
+                _diagnostics.Report("FLX0406", $"schedule target '{runStep.Name}' is ambiguous.{candidates}", runStep.Location);
                 continue;
             }
 
-            if (overloads.Count == 0)
+            if (resolution.Functions.Count == 0)
             {
-                _diagnostics.Report("FLX0101", $"run target '{runStep.Name}' does not exist.", runStep.Location);
+                var message = resolution.IsWildcard
+                    ? $"wildcard schedule target '{runStep.Name}' matched no function groups."
+                    : $"run target '{runStep.Name}' does not exist.";
+                _diagnostics.Report("FLX0101", message, runStep.Location);
                 continue;
             }
 
-            foreach (var overload in overloads.Where(function => !IsRunnableInMvp(function, model)))
+            foreach (var overload in resolution.Functions.Where(function => !IsRunnableInMvp(function, model)))
             {
                 _diagnostics.Report(
                     "FLX0104",
@@ -515,7 +521,32 @@ internal sealed class SemanticAnalyzer
             }
         }
 
+        CheckDuplicateRunTargets(model);
         CheckScheduleLabels(model.Schedules[0]);
+    }
+
+    private void CheckDuplicateRunTargets(CompilationModel model)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var runStep in model.Schedules[0].Steps.OfType<RunStepSyntax>())
+        {
+            var resolution = ScheduleTargetResolver.Resolve(model, runStep, model.ScheduleModule);
+            if (resolution.Functions.Count == 0 || resolution.IsAmbiguous)
+                continue;
+
+            foreach (var fullName in resolution.FunctionGroupFullNames)
+            {
+                counts.TryGetValue(fullName, out var count);
+                counts[fullName] = count + 1;
+                if (count > 0)
+                {
+                    _diagnostics.ReportWarning(
+                        "FLX0408",
+                        $"schedule target '{fullName}' is included more than once.",
+                        runStep.Location);
+                }
+            }
+        }
     }
 
     private void CheckScheduleLabels(ScheduleDeclSyntax schedule)

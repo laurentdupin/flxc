@@ -193,13 +193,40 @@ internal abstract class ScheduleStmtSyntax
 
 internal sealed class RunStepSyntax : ScheduleStmtSyntax
 {
-    public RunStepSyntax(string name, SourceLocation location)
+    public RunStepSyntax(ScheduleTargetSyntax target, SourceLocation location)
         : base(location)
     {
-        Name = name;
+        Target = target;
     }
 
-    public string Name { get; }
+    public ScheduleTargetSyntax Target { get; }
+    public string Name => Target.Text;
+}
+
+internal sealed class ScheduleTargetSyntax
+{
+    public ScheduleTargetSyntax(IReadOnlyList<ScheduleTargetSegmentSyntax> segments)
+    {
+        Segments = segments;
+        Text = string.Join(".", segments.Select(segment => segment.Text));
+        HasWildcard = segments.Any(segment => segment.IsWildcard);
+    }
+
+    public IReadOnlyList<ScheduleTargetSegmentSyntax> Segments { get; }
+    public string Text { get; }
+    public bool HasWildcard { get; }
+}
+
+internal sealed class ScheduleTargetSegmentSyntax
+{
+    public ScheduleTargetSegmentSyntax(string text, bool isWildcard)
+    {
+        Text = text;
+        IsWildcard = isWildcard;
+    }
+
+    public string Text { get; }
+    public bool IsWildcard { get; }
 }
 
 internal sealed class LabelStepSyntax : ScheduleStmtSyntax

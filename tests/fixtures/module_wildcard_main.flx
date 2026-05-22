@@ -1,0 +1,5 @@
+module game.main;
+
+schedule {
+    run *.Update;
+}

@@ -15,6 +15,7 @@ internal sealed class ModuleMetadata
 
 internal sealed class FunctionMetadata
 {
+    public string Source { get; set; } = "";
     public string SourceName { get; set; } = "";
     public string FullName { get; set; } = "";
     public string MangledName { get; set; } = "";
@@ -39,8 +40,11 @@ internal sealed class CImportMetadata
 
 internal sealed class ComponentMetadata
 {
+    public string Source { get; set; } = "";
     public string Name { get; set; } = "";
     public string FullName { get; set; } = "";
+    public int Line { get; set; }
+    public int Column { get; set; }
     public List<ComponentFieldMetadata> Fields { get; set; } = [];
 }
 
@@ -53,8 +57,11 @@ internal sealed class ComponentFieldMetadata
 
 internal sealed class PrefabMetadata
 {
+    public string Source { get; set; } = "";
     public string Name { get; set; } = "";
     public string FullName { get; set; } = "";
+    public int Line { get; set; }
+    public int Column { get; set; }
     public List<string> FlattenedComponents { get; set; } = [];
 }
 
@@ -67,4 +74,7 @@ internal sealed class ScheduleStepMetadata
 {
     public string Kind { get; set; } = "run";
     public string Name { get; set; } = "";
+    public string Target { get; set; } = "";
+    public bool IsWildcard { get; set; }
+    public List<string> ExpandedTargets { get; set; } = [];
 }

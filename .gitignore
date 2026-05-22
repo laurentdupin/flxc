@@ -303,6 +303,7 @@ node_modules/
 tools/vscode/flx/server/
 tools/vscode/flx/server-bundle/
 tools/vscode/flx/*.vsix
+tools/visualstudio/Flx.VisualStudio/server-bundle/
 
 # Visual Studio 6 build log
 *.plg

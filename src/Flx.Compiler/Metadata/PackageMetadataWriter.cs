@@ -29,8 +29,11 @@ internal static class PackageMetadataWriter
             .OrderBy(component => component.FullName, StringComparer.Ordinal)
             .Select(component => new ComponentMetadata
             {
+                Source = RelativeSourcePath(component.SourceFile, package),
                 Name = component.Name,
                 FullName = component.FullName,
+                Line = component.Syntax.NameLocation.Line,
+                Column = component.Syntax.NameLocation.Column,
                 Fields = component.Fields.Select(field => new ComponentFieldMetadata
                 {
                     Type = field.Type,
@@ -44,8 +47,11 @@ internal static class PackageMetadataWriter
             .OrderBy(prefab => prefab.FullName, StringComparer.Ordinal)
             .Select(prefab => new PrefabMetadata
             {
+                Source = RelativeSourcePath(prefab.SourceFile, package),
                 Name = prefab.Name,
                 FullName = prefab.FullName,
+                Line = prefab.Syntax.NameLocation.Line,
+                Column = prefab.Syntax.NameLocation.Column,
                 FlattenedComponents = prefab.FlattenedComponents.Select(component => component.FullName).ToList()
             }).ToList();
 
@@ -55,6 +61,7 @@ internal static class PackageMetadataWriter
             .ThenBy(function => function.MangledName, StringComparer.Ordinal)
             .Select(function => new FunctionMetadata
             {
+                Source = RelativeSourcePath(function.SourceFile, package),
                 SourceName = function.SourceName,
                 FullName = function.FullName,
                 MangledName = function.MangledName,
@@ -88,6 +95,7 @@ internal static class PackageMetadataWriter
             Type = package.Type,
             FlxCompilerVersion = PackageMetadata.CurrentCompilerVersion,
             RuntimeAbi = PackageMetadata.CurrentRuntimeAbi,
+            SourceRoot = package.RootDirectory,
             Headers = publicHeaders.ToList(),
             Symbols = new PackageSymbolsMetadata
             {
@@ -106,6 +114,13 @@ internal static class PackageMetadataWriter
     private static bool IsOwnedBy(Flx.Compiler.Frontend.SourceFile sourceFile, LoadedPackage package)
     {
         return string.Equals(sourceFile.PackageName, package.Name, StringComparison.Ordinal);
+    }
+
+    private static string RelativeSourcePath(Flx.Compiler.Frontend.SourceFile sourceFile, LoadedPackage package)
+    {
+        return Path.GetRelativePath(package.RootDirectory, sourceFile.FullPath)
+            .Replace(Path.DirectorySeparatorChar, '/')
+            .Replace(Path.AltDirectorySeparatorChar, '/');
     }
 
     private static string ComputeAbiHash(PackageMetadata metadata)

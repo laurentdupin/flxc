@@ -1,0 +1,7 @@
+module game.zombies;
+
+import c "stdio.h" as stdio
+
+void Update() {
+    stdio.printf("zombie\n");
+}

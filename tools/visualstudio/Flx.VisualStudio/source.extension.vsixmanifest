@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Flx.VisualStudio" Version="0.1.0" Language="en-US" Publisher="flxc" />
+    <Identity Id="Flx.VisualStudio" Version="0.3.0" Language="en-US" Publisher="flxc" />
     <DisplayName>FLX Language Support</DisplayName>
-    <Description xml:space="preserve">Basic editor support for FLX files: TextMate coloring, comments, bracket matching, auto-closing pairs, and indentation.</Description>
+    <Description xml:space="preserve">Editor support for FLX files: TextMate coloring, comments, bracket matching, diagnostics, hover, go to definition, and completion through flx-lsp.</Description>
     <MoreInfo>https://github.com/laurentdupin/flxc</MoreInfo>
-    <Tags>FLX;TextMate;language;syntax highlighting</Tags>
+    <Tags>FLX;TextMate;language;syntax highlighting;LSP</Tags>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,19.0)">
@@ -26,5 +26,6 @@
   </Prerequisites>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.VsPackage" Path="Flx.pkgdef" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" Path="|Flx.VisualStudio|" />
   </Assets>
 </PackageManifest>
