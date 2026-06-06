@@ -1,0 +1,88 @@
+// CPU-heavy scheduler benchmark/demo.
+//
+// Build/run on Windows with MSVC:
+//   dotnet run --project src\Flx.Compiler\Flx.Compiler.csproj -- examples\benchmarks\parallel_cpu.flx -o build\benchmarks\parallel_cpu.exe --cc-mode msvc
+//   $env:FLX_WORKERS = "1"; build\benchmarks\parallel_cpu.exe
+//   $env:FLX_WORKERS = "8"; build\benchmarks\parallel_cpu.exe
+//
+// The timed workload is Crunch(WorkItem). It has exactly one prefab parameter,
+// reads object data, performs local CPU work, and does not print or write
+// prefab/global state, so current flxc can schedule it with flx_parallel_for.
+// FLX_WORKERS is honored by the generated Windows runtime. Non-Windows
+// generated runtime currently falls back to serial execution.
+
+import c "stdio.h" as stdio
+import c "stdlib.h" as stdlib
+import c "time.h" as ctime
+
+component WorkData {
+    string tag = "cpu-work";
+}
+
+prefab WorkItem {
+    flatten WorkData;
+}
+
+usize object_count = 32768;
+usize crunch_iterations = 8192;
+double started_seconds = 0.0;
+
+double NowSeconds() {
+    struct timespec ts;
+
+    if (ctime.timespec_get(&ts, TIME_UTC) != TIME_UTC) {
+        return (double)ctime.time(null);
+    }
+
+    return (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+}
+
+void PrintBenchmarkInfo() {
+    const char *workers = stdlib.getenv("FLX_WORKERS");
+
+    stdio.printf("FLX parallel CPU benchmark\n");
+    stdio.printf("objects: %zu\n", object_count);
+    stdio.printf("iterations/object: %zu\n", crunch_iterations);
+    stdio.printf("FLX_WORKERS: %s\n", workers == null ? "<unset>" : workers);
+    stdio.printf("Worker note: unset uses logical CPUs on Windows; runtime clamps to object batches and 64 workers. Non-Windows generated runtime is serial today.\n");
+    stdio.printf("Timing note: setup and printing are outside the measured scheduled prefab update.\n");
+}
+
+void CreateWorkItems() {
+    for (usize i = 0; i < object_count; ++i) {
+        WorkItem item = create WorkItem;
+        (void)item;
+    }
+}
+
+void StartTimer() {
+    started_seconds = NowSeconds();
+}
+
+usize Crunch(WorkItem item) {
+    usize acc = item.ptr->id * (usize)11400714819323198485ull;
+
+    for (usize round = 0; round < crunch_iterations; ++round) {
+        acc ^= acc >> 12;
+        acc ^= acc << 25;
+        acc ^= acc >> 27;
+        acc = (acc * (usize)2685821657736338717ull) + item.ptr->id + round;
+    }
+
+    return (usize)acc;
+}
+
+void StopTimer() {
+    double elapsed = NowSeconds() - started_seconds;
+
+    stdio.printf("scheduled Crunch(WorkItem) elapsed wall time: %.3f seconds\n", elapsed);
+    stdio.printf("Run again with FLX_WORKERS=1 and FLX_WORKERS=8 on the same executable to compare scheduler overhead and CPU scaling.\n");
+}
+
+schedule {
+    run PrintBenchmarkInfo;
+    run CreateWorkItems;
+    run StartTimer;
+    run Crunch;
+    run StopTimer;
+}
