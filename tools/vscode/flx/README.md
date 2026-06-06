@@ -75,7 +75,7 @@ If the extension cannot find the server, set:
 
 ```json
 {
-  "flx.languageServer.path": "C:\\path\\to\\flx-lsp.exe"
+  "flx.languageServer.path": "tools/vscode/flx/server-bundle/flx-lsp.exe"
 }
 ```
 
@@ -83,7 +83,7 @@ Optional server logging:
 
 ```json
 {
-  "flx.languageServer.log": "C:\\temp\\flx-lsp.log"
+  "flx.languageServer.log": ".flx/flx-lsp.log"
 }
 ```
 

@@ -139,6 +139,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (TryReadLongOptionValue(args, ref i, arg, "--generated-list-relative-to", diagnostics, out var generatedListRelativeTo))
+            {
+                options.GeneratedListRelativeTo = generatedListRelativeTo;
+                continue;
+            }
+
             if (TryReadLongOptionValue(args, ref i, arg, "--diagnostics-format", diagnostics, out var diagnosticsFormat))
             {
                 options.DiagnosticsFormat = diagnosticsFormat;

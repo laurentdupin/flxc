@@ -90,6 +90,8 @@ internal static class PackageMetadataWriter
             .Order(StringComparer.Ordinal)
             .ToList();
 
+        var metadataDirectory = Path.GetDirectoryName(Path.GetFullPath(metadataPath)) ??
+                                Directory.GetCurrentDirectory();
         var metadata = new PackageMetadata
         {
             Name = package.Name,
@@ -97,7 +99,7 @@ internal static class PackageMetadataWriter
             Type = package.Type,
             FlxCompilerVersion = PackageMetadata.CurrentCompilerVersion,
             RuntimeAbi = PackageMetadata.CurrentRuntimeAbi,
-            SourceRoot = package.RootDirectory,
+            SourceRoot = RelativePath(metadataDirectory, package.RootDirectory),
             Headers = publicHeaders.ToList(),
             Symbols = new PackageSymbolsMetadata
             {
@@ -120,7 +122,13 @@ internal static class PackageMetadataWriter
 
     private static string RelativeSourcePath(Flx.Compiler.Frontend.SourceFile sourceFile, LoadedPackage package)
     {
-        return Path.GetRelativePath(package.RootDirectory, sourceFile.FullPath)
+        return RelativePath(package.RootDirectory, sourceFile.FullPath);
+    }
+
+    private static string RelativePath(string fromDirectory, string path)
+    {
+        var relativePath = Path.GetRelativePath(fromDirectory, path);
+        return (relativePath.Length == 0 ? "." : relativePath)
             .Replace(Path.DirectorySeparatorChar, '/')
             .Replace(Path.AltDirectorySeparatorChar, '/');
     }

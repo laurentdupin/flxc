@@ -62,10 +62,12 @@
   </PropertyGroup>
 
   <Target Name="PublishFlxLanguageServerForVsix">
-    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\..\..\src\Flx.LanguageServer\Flx.LanguageServer.csproj&quot; -c Release -o &quot;$(MSBuildProjectDirectory)\server-bundle&quot;" />
+    <Exec
+      WorkingDirectory="$(MSBuildProjectDirectory)"
+      Command="dotnet publish &quot;..\..\..\src\Flx.LanguageServer\Flx.LanguageServer.csproj&quot; -c Release -o &quot;server-bundle&quot;" />
     <ItemGroup>
-      <Content Include="$(MSBuildProjectDirectory)\server-bundle\**\*"
-               Exclude="$(MSBuildProjectDirectory)\server-bundle\**\*.pdb;$(MSBuildProjectDirectory)\server-bundle\**\*.xml">
+      <Content Include="server-bundle\**\*"
+               Exclude="server-bundle\**\*.pdb;server-bundle\**\*.xml">
         <Link>server-bundle\%(RecursiveDir)%(Filename)%(Extension)</Link>
         <IncludeInVSIX>true</IncludeInVSIX>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

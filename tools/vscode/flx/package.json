@@ -37,12 +37,12 @@
         "flx.languageServer.path": {
           "type": "string",
           "default": "",
-          "description": "Path to flx-lsp. If empty, the extension tries common repo-local paths and PATH."
+          "description": "Path to flx-lsp. Relative paths resolve from the workspace first, then the extension folder. If empty, the extension tries bundled/repo-local paths and PATH."
         },
         "flx.languageServer.log": {
           "type": "string",
           "default": "",
-          "description": "Optional path for flx-lsp log output."
+          "description": "Optional path for flx-lsp log output. Relative paths resolve from the workspace folder."
         }
       }
     },

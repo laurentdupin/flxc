@@ -332,7 +332,7 @@ internal sealed class BuildDriver
         }
 
         if (!string.IsNullOrWhiteSpace(options.GeneratedListPath))
-            await WriteGeneratedListAsync(options.GeneratedListPath, generatedSources);
+            await WriteGeneratedListAsync(options.GeneratedListPath, generatedSources, options.GeneratedListRelativeTo);
 
         if (options.BuildLibrary && packageGraph is not null)
             await EmitLibraryPackageArtifactsAsync(packageGraph.RootPackage, model, outputDirectory, options);
@@ -424,13 +424,20 @@ internal sealed class BuildDriver
         return builder.ToString();
     }
 
-    private static async Task WriteGeneratedListAsync(string generatedListPath, IReadOnlyList<string> generatedSources)
+    private static async Task WriteGeneratedListAsync(
+        string generatedListPath,
+        IReadOnlyList<string> generatedSources,
+        string? relativeTo)
     {
         var fullPath = Path.GetFullPath(generatedListPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        var baseDirectory = string.IsNullOrWhiteSpace(relativeTo)
+            ? null
+            : Path.GetFullPath(relativeTo);
 
         var lines = generatedSources
             .Select(Path.GetFullPath)
+            .Select(path => baseDirectory is null ? path : Path.GetRelativePath(baseDirectory, path))
             .Order(StringComparer.OrdinalIgnoreCase);
 
         await File.WriteAllLinesAsync(fullPath, lines);

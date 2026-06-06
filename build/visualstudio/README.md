@@ -87,7 +87,7 @@ Useful project properties:
   <FlxCompilerPath>$(SolutionDir)..\..\src\Flx.Compiler\bin\Debug\net10.0\flxc.exe</FlxCompilerPath>
   <FlxPreprocessorDefinitions>WIN32_LEAN_AND_MEAN;UNICODE</FlxPreprocessorDefinitions>
   <FlxAdditionalIncludeDirectories>$(ProjectDir)include</FlxAdditionalIncludeDirectories>
-  <FlxAdditionalOptions>--diagnostics-format msbuild --absolute-line-directives</FlxAdditionalOptions>
+  <FlxAdditionalOptions>--diagnostics-format msbuild</FlxAdditionalOptions>
 </PropertyGroup>
 ```
 

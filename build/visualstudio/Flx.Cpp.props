@@ -8,12 +8,13 @@
 
     <FlxGeneratedDir Condition="'$(FlxGeneratedDir)' == ''">$(IntDir)flx</FlxGeneratedDir>
     <FlxGeneratedList Condition="'$(FlxGeneratedList)' == ''">$(FlxGeneratedDir)\generated_c_files.txt</FlxGeneratedList>
+    <FlxGeneratedListRelativeTo Condition="'$(FlxGeneratedListRelativeTo)' == ''">$(MSBuildProjectDirectory)</FlxGeneratedListRelativeTo>
     <FlxPackageOutputDir Condition="'$(FlxPackageOutputDir)' == ''">$(OutDir)flx</FlxPackageOutputDir>
 
     <FlxCCompiler Condition="'$(FlxCCompiler)' == ''">cl</FlxCCompiler>
     <FlxCCompilerMode Condition="'$(FlxCCompilerMode)' == ''">msvc</FlxCCompilerMode>
 
-    <FlxAdditionalOptions Condition="'$(FlxAdditionalOptions)' == ''">--diagnostics-format msbuild --absolute-line-directives</FlxAdditionalOptions>
+    <FlxAdditionalOptions Condition="'$(FlxAdditionalOptions)' == ''">--diagnostics-format msbuild</FlxAdditionalOptions>
     <FlxPreprocessorDefinitions Condition="'$(FlxPreprocessorDefinitions)' == ''"></FlxPreprocessorDefinitions>
     <FlxAdditionalIncludeDirectories Condition="'$(FlxAdditionalIncludeDirectories)' == ''"></FlxAdditionalIncludeDirectories>
 

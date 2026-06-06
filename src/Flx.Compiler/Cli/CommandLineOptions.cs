@@ -20,6 +20,7 @@ internal sealed class CommandLineOptions
     public string? MetadataOutputPath { get; set; }
     public string? PublicIncludeDir { get; set; }
     public string? GeneratedListPath { get; set; }
+    public string? GeneratedListRelativeTo { get; set; }
     public string? DiagnosticsFormat { get; set; }
     public string? CCompiler { get; set; }
     public string? CCompilerMode { get; set; }
@@ -57,6 +58,8 @@ internal sealed class CommandLineOptions
                               Public generated header directory for --build-library
           --generated-list <path>
                               Write generated C paths, one per line
+          --generated-list-relative-to <dir>
+                              Write generated C paths relative to this directory
           --diagnostics-format <fmt>
                               Diagnostic format: default or msbuild
           --absolute-line-directives

@@ -70,11 +70,13 @@
 
     <Exec
       Condition="'@(FlxPackage)' != ''"
-      Command="&quot;$(FlxCompilerPath)&quot; --package @(FlxPackage->'&quot;%(FullPath)&quot;', ' ') $(_FlxLibraryModeOptions) --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+      WorkingDirectory="$(MSBuildProjectDirectory)"
+      Command="&quot;$(FlxCompilerPath)&quot; --package @(FlxPackage->'&quot;%(Identity)&quot;', ' ') $(_FlxLibraryModeOptions) --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --generated-list-relative-to &quot;$(FlxGeneratedListRelativeTo)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(Identity)&quot;', ' ') $(FlxAdditionalOptions)" />
 
     <Exec
       Condition="'@(FlxCompile)' != ''"
-      Command="&quot;$(FlxCompilerPath)&quot; @(FlxCompile->'&quot;%(FullPath)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(FullPath)&quot;', ' ') $(FlxAdditionalOptions)" />
+      WorkingDirectory="$(MSBuildProjectDirectory)"
+      Command="&quot;$(FlxCompilerPath)&quot; @(FlxCompile->'&quot;%(Identity)&quot;', ' ') --emit-c --obj-dir &quot;$(FlxGeneratedDir)&quot; --generated-list &quot;$(FlxGeneratedList)&quot; --generated-list-relative-to &quot;$(FlxGeneratedListRelativeTo)&quot; --cc &quot;$(FlxCCompiler)&quot; --cc-mode &quot;$(FlxCCompilerMode)&quot; @(_FlxDefine->'-D&quot;%(Identity)&quot;', ' ') @(_FlxIncludeDir->'-I&quot;%(Identity)&quot;', ' ') $(FlxAdditionalOptions)" />
 
     <Touch Files="$(FlxStampFile)" AlwaysCreate="true" />
   </Target>
@@ -99,7 +101,7 @@
     <ItemGroup>
       <ClCompile Include="@(FlxGeneratedC)">
         <CompileAs>CompileAsC</CompileAs>
-        <AdditionalIncludeDirectories Condition="'@(_FlxBinaryIncludeDir)' != ''">@(_FlxBinaryIncludeDir->'%(FullPath)')</AdditionalIncludeDirectories>
+        <AdditionalIncludeDirectories Condition="'@(_FlxBinaryIncludeDir)' != ''">@(_FlxBinaryIncludeDir->'%(Identity)')</AdditionalIncludeDirectories>
       </ClCompile>
     </ItemGroup>
 

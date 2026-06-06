@@ -66,9 +66,16 @@ function resolveServerPath(
   context: vscode.ExtensionContext,
   configuredPath: string
 ): string | undefined {
-  if (configuredPath.length > 0) {
-    if (fileExists(configuredPath) || !looksLikePath(configuredPath)) {
-      return configuredPath;
+  const trimmedPath = configuredPath.trim();
+  if (trimmedPath.length > 0) {
+    if (!looksLikePath(trimmedPath)) {
+      return trimmedPath;
+    }
+
+    for (const candidate of resolveConfiguredPathCandidates(context, trimmedPath)) {
+      if (fileExists(candidate)) {
+        return candidate;
+      }
     }
 
     return undefined;
@@ -93,8 +100,11 @@ function resolveServerPath(
 }
 
 function resolveLogPath(context: vscode.ExtensionContext, configuredPath: string): string {
-  if (configuredPath.length > 0) {
-    return configuredPath;
+  const trimmedPath = configuredPath.trim();
+  if (trimmedPath.length > 0) {
+    const resolvedPath = resolveWritableConfiguredPath(context, trimmedPath);
+    fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+    return resolvedPath;
   }
 
   const directory = context.globalStorageUri.fsPath;
@@ -112,6 +122,44 @@ function fileExists(filePath: string): boolean {
 
 function looksLikePath(value: string): boolean {
   return value.includes("/") || value.includes("\\") || path.isAbsolute(value);
+}
+
+function resolveConfiguredPathCandidates(
+  context: vscode.ExtensionContext,
+  configuredPath: string
+): string[] {
+  const expandedPath = expandConfiguredPath(context, configuredPath);
+  if (path.isAbsolute(expandedPath)) {
+    return [expandedPath];
+  }
+
+  const candidates: string[] = [];
+  for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
+    candidates.push(path.resolve(workspaceFolder.uri.fsPath, expandedPath));
+  }
+
+  candidates.push(context.asAbsolutePath(expandedPath));
+  return Array.from(new Set(candidates));
+}
+
+function resolveWritableConfiguredPath(
+  context: vscode.ExtensionContext,
+  configuredPath: string
+): string {
+  const expandedPath = expandConfiguredPath(context, configuredPath);
+  if (path.isAbsolute(expandedPath)) {
+    return expandedPath;
+  }
+
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return path.resolve(workspaceFolder ?? context.globalStorageUri.fsPath, expandedPath);
+}
+
+function expandConfiguredPath(context: vscode.ExtensionContext, configuredPath: string): string {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return configuredPath
+    .replace(/\$\{workspaceFolder\}/g, workspaceFolder ?? "")
+    .replace(/\$\{extensionPath\}/g, context.extensionPath);
 }
 
 function findOnPath(executable: string): string | undefined {
