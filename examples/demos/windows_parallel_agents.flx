@@ -4,8 +4,11 @@ import c "stdlib.h" as stdlib
 import c "time.h" as ctime
 
 windows.HWND MainWindow = null;
+windows.HDC CurrentDc = null;
 i32 FrameIndex = 0;
 i32 MaxFrames = 180;
+int CurrentWidth = 1;
+int CurrentHeight = 1;
 usize AgentCount = 50000;
 usize WorkIterations = 2048;
 double FrameStartSeconds = 0.0;
@@ -16,6 +19,10 @@ i32 AssetReported = 0;
 
 component AgentData {
     string tag = "agent";
+    i32 x = 0;
+    i32 y = 0;
+    i32 vx = 1;
+    i32 vy = 1;
 }
 
 prefab Agent {
@@ -88,7 +95,10 @@ void CreateMainWindow() {
 void CreateAgents() {
     for (usize i = 0; i < AgentCount; ++i) {
         Agent agent = create Agent;
-        (void)agent;
+        agent.x = (i32)((i * 37) % 960);
+        agent.y = (i32)(((i / 64) * 19) % 540);
+        agent.vx = (i32)((i % 7) + 1);
+        agent.vy = (i32)(((i / 11) % 5) + 1);
     }
 }
 
@@ -135,31 +145,58 @@ usize UpdateAgent(Agent agent) {
         acc = (acc * (usize)2685821657736338717ull) + agent.ptr->id + round;
     }
 
+    agent.x = agent.x + agent.vx + (i32)(acc & 1);
+    agent.y = agent.y + agent.vy + (i32)((acc >> 1) & 1);
+
+    if (agent.x >= 960 || agent.x < 0) {
+        agent.vx = -agent.vx;
+        agent.x = agent.x + agent.vx;
+    }
+
+    if (agent.y >= 540 || agent.y < 0) {
+        agent.vy = -agent.vy;
+        agent.y = agent.y + agent.vy;
+    }
+
     return acc;
 }
 
-void RenderFrame() {
+void BeginRenderFrame() {
     if (MainWindow == null) {
         return;
     }
 
-    windows.HDC dc = windows.GetDC(MainWindow);
+    CurrentDc = windows.GetDC(MainWindow);
     windows.RECT rect;
     windows.GetClientRect(MainWindow, &rect);
 
     windows.HBRUSH background = (windows.HBRUSH)(windows.COLOR_WINDOW + 1);
-    windows.FillRect(dc, &rect, background);
+    windows.FillRect(CurrentDc, &rect, background);
 
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
+    CurrentWidth = rect.right - rect.left;
+    CurrentHeight = rect.bottom - rect.top;
+}
 
-    for (usize i = 0; i < AgentCount && i < 2500; ++i) {
-        int x = (int)((i * 37 + (usize)FrameIndex * 3) % (usize)(width > 1 ? width : 1));
-        int y = (int)(((i / 64) * 19 + (usize)FrameIndex * 2) % (usize)(height > 1 ? height : 1));
-        windows.SetPixel(dc, x, y, windows.RGB(24, 120 + (int)(i % 80), 220));
+void RenderAgent(Agent agent) {
+    if (CurrentDc == null || agent.ptr->id > 2500) {
+        return;
     }
 
-    windows.ReleaseDC(MainWindow, dc);
+    int width = CurrentWidth > 1 ? CurrentWidth : 1;
+    int height = CurrentHeight > 1 ? CurrentHeight : 1;
+    int x = agent.x % width;
+    int y = agent.y % height;
+
+    windows.SetPixel(CurrentDc, x, y, windows.RGB(24, 120 + (int)(agent.ptr->id % 80), 220));
+}
+
+void EndRenderFrame() {
+    if (MainWindow == null || CurrentDc == null) {
+        return;
+    }
+
+    windows.ReleaseDC(MainWindow, CurrentDc);
+    CurrentDc = null;
 }
 
 void FinishFrame() {
@@ -191,7 +228,9 @@ frame:
     run TickAssetLoad;
     run StartFrameTimer;
     run UpdateAgent;
-    run RenderFrame;
+    run BeginRenderFrame;
+    run RenderAgent;
+    run EndRenderFrame;
     run FinishFrame;
     run SleepFrame;
     loopto frame;

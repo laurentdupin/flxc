@@ -97,6 +97,27 @@ public sealed class CompilerFixtureTests
         Assert.Contains("agent.ptr->AgentData.energy", moduleSource);
     }
 
+    [Fact]
+    public async Task MutatingCurrentPrefabFields_CanRunParallel()
+    {
+        using var output = TemporaryOutputDirectory.Create();
+
+        var result = await RunCompilerAsync(output.Path, "parallel_mutating_fields.flx");
+
+        AssertSuccess(result);
+
+        using var metadata = ReadSingleMetadata(output.Path);
+        var move = FindFunction(metadata, "Move");
+
+        Assert.True(move.GetProperty("parallelizable").GetBoolean());
+
+        var mainSource = await File.ReadAllTextAsync(Path.Combine(output.Path, "flx_main.g.c"));
+        Assert.Contains("flx_parallel_for(", mainSource);
+
+        var moduleSource = await File.ReadAllTextAsync(Path.Combine(output.Path, "parallel_mutating_fields.flx.g.c"));
+        Assert.Contains("agent.ptr->AgentData.x = agent.ptr->AgentData.x + agent.ptr->AgentData.velocity;", moduleSource);
+    }
+
     private static async Task<CompilerResult> RunCompilerAsync(string outputDirectory, string fixtureName)
     {
         var repositoryRoot = FindRepositoryRoot();

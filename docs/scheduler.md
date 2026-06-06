@@ -40,9 +40,10 @@ First-pass requirements:
 - exactly one parameter
 - the parameter type is a known prefab
 - the function does not create, destroy, or reparent objects
-- the function does not assign prefab fields
 - the function does not write globals
 - every imported C call in the body is marked with `parallel alias.member;`
+
+Prefab field assignment is allowed for the current object parameter in this first runtime because each scheduled iteration receives a distinct object view. This is still conservative: writes to globals, creates/destroys/reparents, and unknown external effects keep the step serial.
 
 If a scheduled function is not parallelizable, code generation keeps the serial per-object loop and records the reason in metadata.
 

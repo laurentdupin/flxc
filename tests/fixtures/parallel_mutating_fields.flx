@@ -1,0 +1,25 @@
+component AgentData {
+    i32 x = 1;
+    i32 velocity = 2;
+}
+
+prefab Agent {
+    flatten AgentData;
+}
+
+void CreateAgents() {
+    for (i32 i = 0; i < 4; ++i) {
+        Agent agent = create Agent;
+        agent.x = i;
+        agent.velocity = i + 1;
+    }
+}
+
+void Move(Agent agent) {
+    agent.x = agent.x + agent.velocity;
+}
+
+schedule {
+    run CreateAgents;
+    run Move;
+}

@@ -474,10 +474,6 @@ internal sealed class SemanticAnalyzer
         if (!model.PrefabsByFullName.ContainsKey(receiverType))
             return FunctionParallelInfo.Serial("function parameter is not a prefab");
 
-        var receiverName = Regex.Escape(function.Parameters[0].Name);
-        if (Regex.IsMatch(body, $@"\b{receiverName}\.[A-Za-z_][A-Za-z0-9_]*\s*=(?!=)", RegexOptions.Multiline))
-            return FunctionParallelInfo.Serial("function assigns prefab fields");
-
         foreach (var global in model.GlobalsByFullName.Values)
         {
             if (Regex.IsMatch(body, $@"\b{Regex.Escape(global.Name)}\s*=(?!=)", RegexOptions.Multiline))
