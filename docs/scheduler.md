@@ -47,6 +47,26 @@ Prefab field assignment is allowed for the current object parameter in this firs
 
 If a scheduled function is not parallelizable, code generation keeps the serial per-object loop and records the reason in metadata.
 
+## Explaining Schedule Decisions
+
+Use `--explain-schedule` to print how each schedule step resolves and whether each `run` step will execute serially or through `flx_parallel_for`:
+
+```powershell
+dotnet run --project src\Flx.Compiler\Flx.Compiler.csproj -- tests\fixtures\parallel_zombies.flx --no-preprocess --explain-schedule
+```
+
+Example output:
+
+```text
+Schedule explanation:
+  run CreateZombies: serial
+    CreateZombies: function creates objects
+  run Greet: parallel
+    Greet: parallelizable
+```
+
+This mode runs parsing and semantic analysis, prints the scheduler explanation, and stops before generated C is emitted.
+
 ## Worker Count
 
 Generated programs use the logical CPU count by default on Windows. Set `FLX_WORKERS` to a positive integer to override the requested worker count:

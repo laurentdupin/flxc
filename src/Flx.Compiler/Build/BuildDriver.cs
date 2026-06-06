@@ -94,6 +94,14 @@ internal sealed class BuildDriver
         if (diagnostics.HasWarnings)
             diagnostics.PrintWarningsTo(error);
 
+        if (options.ExplainSchedule)
+        {
+            WriteScheduleExplanation(model, output);
+            if (shouldDeleteDirectory)
+                TryDeleteDirectory(outputDirectory);
+            return 0;
+        }
+
         var generation = await GenerateAsync(model, options, packageGraph, outputDirectory, shouldDeleteDirectory);
 
         if (options.EmitC)
@@ -441,6 +449,62 @@ internal sealed class BuildDriver
             .Order(StringComparer.OrdinalIgnoreCase);
 
         await File.WriteAllLinesAsync(fullPath, lines);
+    }
+
+    private static void WriteScheduleExplanation(CompilationModel model, TextWriter output)
+    {
+        output.WriteLine("Schedule explanation:");
+
+        if (model.Schedule is null || model.ScheduleModule is null)
+        {
+            output.WriteLine("  no schedule");
+            return;
+        }
+
+        foreach (var step in model.Schedule.Steps)
+        {
+            switch (step)
+            {
+                case RunStepSyntax run:
+                    WriteRunExplanation(model, model.ScheduleModule, run, output);
+                    break;
+                case LabelStepSyntax label:
+                    output.WriteLine($"  label {label.Name}");
+                    break;
+                case LoopToStepSyntax loopTo:
+                    output.WriteLine($"  loopto {loopTo.TargetLabel}");
+                    break;
+            }
+        }
+    }
+
+    private static void WriteRunExplanation(
+        CompilationModel model,
+        ModuleSymbol scheduleModule,
+        RunStepSyntax run,
+        TextWriter output)
+    {
+        var resolution = ScheduleTargetResolver.Resolve(model, run, scheduleModule);
+        if (resolution.Functions.Count == 0)
+        {
+            output.WriteLine($"  run {run.Name}: unresolved");
+            return;
+        }
+
+        var execution = resolution.Functions.All(function => function.ParallelInfo.CanRunParallel)
+            ? "parallel"
+            : "serial";
+        output.WriteLine($"  run {run.Name}: {execution}");
+
+        foreach (var function in resolution.Functions
+                     .OrderBy(function => function.FullName, StringComparer.Ordinal)
+                     .ThenBy(function => function.MangledName, StringComparer.Ordinal))
+        {
+            var reason = function.ParallelInfo.CanRunParallel
+                ? "parallelizable"
+                : function.ParallelInfo.ReasonIfNot ?? "not parallelizable";
+            output.WriteLine($"    {function.FullName}: {reason}");
+        }
     }
 
     private static string DetermineGeneratedDirectory(CommandLineOptions options, out bool shouldDeleteDirectory)

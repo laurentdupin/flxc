@@ -16,6 +16,7 @@ internal sealed class CommandLineOptions
     public bool NoMain { get; set; }
     public bool ShowHelp { get; set; }
     public bool ShowVersion { get; set; }
+    public bool ExplainSchedule { get; set; }
     public string? ObjDir { get; set; }
     public string? MetadataOutputPath { get; set; }
     public string? PublicIncludeDir { get; set; }
@@ -64,6 +65,7 @@ internal sealed class CommandLineOptions
                               Diagnostic format: default or msbuild
           --absolute-line-directives
                               Use absolute source paths in generated #line directives
+          --explain-schedule  Print schedule target resolution and parallel decisions, then stop
           --cc <compiler>     C compiler name or path, or auto
           --cc-mode <mode>    C compiler mode: gcc, clang, or msvc
           -I <dir>            C include directory

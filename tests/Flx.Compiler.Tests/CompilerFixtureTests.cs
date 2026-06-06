@@ -118,7 +118,52 @@ public sealed class CompilerFixtureTests
         Assert.Contains("agent.ptr->AgentData.x = agent.ptr->AgentData.x + agent.ptr->AgentData.velocity;", moduleSource);
     }
 
-    private static async Task<CompilerResult> RunCompilerAsync(string outputDirectory, string fixtureName)
+    [Fact]
+    public async Task ExplainSchedule_ReportsParallelAndSerialReasons()
+    {
+        using var parallelOutput = TemporaryOutputDirectory.Create();
+        var parallel = await RunCompilerAsync(
+            parallelOutput.Path,
+            "parallel_zombies.flx",
+            emitC: false,
+            "--explain-schedule");
+
+        AssertSuccess(parallel);
+        Assert.Contains("Schedule explanation:", parallel.Output);
+        Assert.Contains("run CreateZombies: serial", parallel.Output);
+        Assert.Contains("CreateZombies: function creates objects", parallel.Output);
+        Assert.Contains("run Greet: parallel", parallel.Output);
+        Assert.Contains("Greet: parallelizable", parallel.Output);
+        Assert.False(File.Exists(Path.Combine(parallelOutput.Path, "flx_main.g.c")), parallel.Output);
+
+        using var serialOutput = TemporaryOutputDirectory.Create();
+        var serial = await RunCompilerAsync(
+            serialOutput.Path,
+            "parallel_zombies_unannotated_printf.flx",
+            emitC: false,
+            "--explain-schedule");
+
+        AssertSuccess(serial);
+        Assert.Contains("run Greet: serial", serial.Output);
+        Assert.Contains("Greet: calls external function 'stdio.printf' that is not marked parallel", serial.Output);
+
+        using var mutatingOutput = TemporaryOutputDirectory.Create();
+        var mutating = await RunCompilerAsync(
+            mutatingOutput.Path,
+            "parallel_mutating_fields.flx",
+            emitC: false,
+            "--explain-schedule");
+
+        AssertSuccess(mutating);
+        Assert.Contains("run Move: parallel", mutating.Output);
+        Assert.Contains("Move: parallelizable", mutating.Output);
+    }
+
+    private static async Task<CompilerResult> RunCompilerAsync(
+        string outputDirectory,
+        string fixtureName,
+        bool emitC = true,
+        params string[] extraArgs)
     {
         var repositoryRoot = FindRepositoryRoot();
         var compilerAssembly = FindCompilerAssembly(repositoryRoot);
@@ -132,10 +177,13 @@ public sealed class CompilerFixtureTests
             RedirectStandardError = true
         };
         startInfo.ArgumentList.Add(compilerAssembly);
-        startInfo.ArgumentList.Add("--emit-c");
+        if (emitC)
+            startInfo.ArgumentList.Add("--emit-c");
         startInfo.ArgumentList.Add("--no-preprocess");
         startInfo.ArgumentList.Add("--obj-dir");
         startInfo.ArgumentList.Add(outputDirectory);
+        foreach (var extraArg in extraArgs)
+            startInfo.ArgumentList.Add(extraArg);
         startInfo.ArgumentList.Add(fixturePath);
 
         using var process = Process.Start(startInfo)

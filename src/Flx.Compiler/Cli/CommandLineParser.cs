@@ -97,6 +97,12 @@ internal static class CommandLineParser
                 continue;
             }
 
+            if (arg == "--explain-schedule")
+            {
+                options.ExplainSchedule = true;
+                continue;
+            }
+
             if (arg == "-o")
             {
                 options.OutputPath = RequireValue(args, ref i, arg, diagnostics);
