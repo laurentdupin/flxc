@@ -272,6 +272,8 @@ internal sealed class CompilationModel
                                    RequiresProgramArguments ||
                                    FunctionRegistry.AllFunctions.Any(function => function.NeedsWorld ||
                                        function.Parameters.Any(parameter => PrefabsByFullName.ContainsKey(parameter.Type)) ||
+                                       function.Syntax.BodyText.Contains("flx_task_", StringComparison.Ordinal) ||
+                                       function.Syntax.BodyText.Contains("flx_file_task", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("string", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("Array<", StringComparison.Ordinal) ||
                                        function.Syntax.BodyText.Contains("i32 ", StringComparison.Ordinal) ||

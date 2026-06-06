@@ -1,0 +1,25 @@
+import c "stdio.h" as stdio
+
+void TickFileLoad() {
+    static flx_file_task task = { 0 };
+    static i32 started = 0;
+
+    if (started == 0) {
+        task = flx_task_read_file_start("tests/fixtures/hello.flx");
+        started = 1;
+        stdio.printf("file load started\n");
+    }
+
+    if (flx_task_poll_file(&task)) {
+        stdio.printf("file load status %d, bytes %zu\n", flx_task_file_status(&task), flx_task_file_length(&task));
+        flx_task_destroy_file(&task);
+        breakloop;
+        return;
+    }
+}
+
+schedule {
+load:
+    run TickFileLoad;
+    loopto load;
+}
