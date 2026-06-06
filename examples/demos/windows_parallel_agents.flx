@@ -1,0 +1,198 @@
+import c "windows.h" as windows
+import c "stdio.h" as stdio
+import c "stdlib.h" as stdlib
+import c "time.h" as ctime
+
+windows.HWND MainWindow = null;
+i32 FrameIndex = 0;
+i32 MaxFrames = 180;
+usize AgentCount = 50000;
+usize WorkIterations = 2048;
+double FrameStartSeconds = 0.0;
+double TotalUpdateSeconds = 0.0;
+flx_file_task AssetTask;
+i32 AssetStarted = 0;
+i32 AssetReported = 0;
+
+component AgentData {
+    string tag = "agent";
+}
+
+prefab Agent {
+    flatten AgentData;
+}
+
+windows.LRESULT WindowProc(
+    windows.HWND hwnd,
+    windows.UINT message,
+    windows.WPARAM wParam,
+    windows.LPARAM lParam
+) {
+    switch (message) {
+        case windows.WM_DESTROY:
+            MainWindow = null;
+            windows.PostQuitMessage(0);
+            return 0;
+    }
+
+    return windows.DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+double NowSeconds() {
+    struct timespec ts;
+
+    if (ctime.timespec_get(&ts, TIME_UTC) != TIME_UTC) {
+        return (double)ctime.time(null);
+    }
+
+    return (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+}
+
+void PrintStartup() {
+    const char *workers = stdlib.getenv("FLX_WORKERS");
+
+    stdio.printf("FLX windowed parallel agents demo\n");
+    stdio.printf("agents: %zu\n", AgentCount);
+    stdio.printf("work iterations/agent/frame: %zu\n", WorkIterations);
+    stdio.printf("FLX_WORKERS: %s\n", workers == null ? "<unset>" : workers);
+}
+
+void CreateMainWindow() {
+    windows.HINSTANCE instance = windows.GetModuleHandleW(null);
+
+    windows.WNDCLASSW windowClass = { 0 };
+    windowClass.lpfnWndProc = WindowProc;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = L"FlxParallelAgentsClass";
+
+    windows.RegisterClassW(&windowClass);
+
+    MainWindow = windows.CreateWindowExW(
+        0,
+        L"FlxParallelAgentsClass",
+        L"FLX Parallel Agents",
+        windows.WS_OVERLAPPEDWINDOW,
+        windows.CW_USEDEFAULT,
+        windows.CW_USEDEFAULT,
+        960,
+        540,
+        null,
+        null,
+        instance,
+        null
+    );
+
+    windows.ShowWindow(MainWindow, windows.SW_SHOW);
+}
+
+void CreateAgents() {
+    for (usize i = 0; i < AgentCount; ++i) {
+        Agent agent = create Agent;
+        (void)agent;
+    }
+}
+
+void PumpMessages() {
+    windows.MSG message;
+
+    while (windows.PeekMessageW(&message, null, 0, 0, windows.PM_REMOVE)) {
+        if (message.message == windows.WM_QUIT) {
+            breakloop;
+            return;
+        }
+
+        windows.TranslateMessage(&message);
+        windows.DispatchMessageW(&message);
+    }
+}
+
+void TickAssetLoad() {
+    if (AssetStarted == 0) {
+        AssetTask = flx_task_read_file_start("docs/scheduler.md");
+        AssetStarted = 1;
+        stdio.printf("background file load started\n");
+    }
+
+    if (AssetReported == 0 && flx_task_poll_file(&AssetTask)) {
+        stdio.printf("background file load status %d, bytes %zu\n", flx_task_file_status(&AssetTask), flx_task_file_length(&AssetTask));
+        flx_task_destroy_file(&AssetTask);
+        AssetReported = 1;
+    }
+}
+
+void StartFrameTimer() {
+    FrameStartSeconds = NowSeconds();
+}
+
+usize UpdateAgent(Agent agent) {
+    usize acc = agent.ptr->id * (usize)11400714819323198485ull;
+    acc += (usize)FrameIndex;
+
+    for (usize round = 0; round < WorkIterations; ++round) {
+        acc ^= acc >> 12;
+        acc ^= acc << 25;
+        acc ^= acc >> 27;
+        acc = (acc * (usize)2685821657736338717ull) + agent.ptr->id + round;
+    }
+
+    return acc;
+}
+
+void RenderFrame() {
+    if (MainWindow == null) {
+        return;
+    }
+
+    windows.HDC dc = windows.GetDC(MainWindow);
+    windows.RECT rect;
+    windows.GetClientRect(MainWindow, &rect);
+
+    windows.HBRUSH background = (windows.HBRUSH)(windows.COLOR_WINDOW + 1);
+    windows.FillRect(dc, &rect, background);
+
+    int width = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+
+    for (usize i = 0; i < AgentCount && i < 2500; ++i) {
+        int x = (int)((i * 37 + (usize)FrameIndex * 3) % (usize)(width > 1 ? width : 1));
+        int y = (int)(((i / 64) * 19 + (usize)FrameIndex * 2) % (usize)(height > 1 ? height : 1));
+        windows.SetPixel(dc, x, y, windows.RGB(24, 120 + (int)(i % 80), 220));
+    }
+
+    windows.ReleaseDC(MainWindow, dc);
+}
+
+void FinishFrame() {
+    double updateSeconds = NowSeconds() - FrameStartSeconds;
+    TotalUpdateSeconds = TotalUpdateSeconds + updateSeconds;
+    FrameIndex = FrameIndex + 1;
+
+    if ((FrameIndex % 30) == 0) {
+        stdio.printf("frame %d update %.3f ms, avg %.3f ms\n", FrameIndex, updateSeconds * 1000.0, (TotalUpdateSeconds / (double)FrameIndex) * 1000.0);
+    }
+
+    if (FrameIndex >= MaxFrames) {
+        stdio.printf("demo complete: %d frames, avg update %.3f ms\n", FrameIndex, (TotalUpdateSeconds / (double)FrameIndex) * 1000.0);
+        breakloop;
+    }
+}
+
+void SleepFrame() {
+    windows.Sleep(1);
+}
+
+schedule {
+    run PrintStartup;
+    run CreateMainWindow;
+    run CreateAgents;
+
+frame:
+    run PumpMessages;
+    run TickAssetLoad;
+    run StartFrameTimer;
+    run UpdateAgent;
+    run RenderFrame;
+    run FinishFrame;
+    run SleepFrame;
+    loopto frame;
+}
