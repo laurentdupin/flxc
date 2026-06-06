@@ -46,6 +46,20 @@ internal static class MetadataWriter
                 Header = import.Header,
                 Alias = import.Alias
             }).ToList(),
+            Tasks = module.Tasks.Select(task => new TaskMetadata
+            {
+                SourceName = task.SourceName,
+                FullName = task.FullName,
+                ReturnType = task.ReturnType,
+                Parameters = task.Parameters.Select(parameter => new ParameterMetadata
+                {
+                    Type = parameter.Type,
+                    Name = parameter.Name
+                }).ToList(),
+                Effects = task.Effects.ToList(),
+                Line = task.Location.Line,
+                Column = task.Location.Column
+            }).ToList(),
             Components = module.Components.Select(component => new ComponentMetadata
             {
                 Name = component.Name,

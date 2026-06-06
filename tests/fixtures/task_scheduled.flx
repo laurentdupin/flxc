@@ -1,0 +1,8 @@
+task Buffer LoadFile(string path)
+effects(blocking_io)
+{
+}
+
+schedule {
+    run LoadFile;
+}

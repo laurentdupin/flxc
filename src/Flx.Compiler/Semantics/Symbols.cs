@@ -174,6 +174,41 @@ internal sealed class FunctionSymbol
     public bool NeedsWorld => !IsExternal && Syntax.BodyText.Contains("create ", StringComparison.Ordinal);
 }
 
+internal sealed class TaskSymbol
+{
+    public TaskSymbol(
+        ModuleSymbol module,
+        SourceFile sourceFile,
+        TaskDeclSyntax syntax,
+        string sourceName,
+        string fullName,
+        string returnType,
+        IReadOnlyList<ParameterSymbol> parameters,
+        IReadOnlyList<string> effects,
+        SourceLocation location)
+    {
+        Module = module;
+        SourceFile = sourceFile;
+        Syntax = syntax;
+        SourceName = sourceName;
+        FullName = fullName;
+        ReturnType = returnType;
+        Parameters = parameters;
+        Effects = effects;
+        Location = location;
+    }
+
+    public ModuleSymbol Module { get; }
+    public SourceFile SourceFile { get; }
+    public TaskDeclSyntax Syntax { get; }
+    public string SourceName { get; }
+    public string FullName { get; }
+    public string ReturnType { get; }
+    public IReadOnlyList<ParameterSymbol> Parameters { get; }
+    public IReadOnlyList<string> Effects { get; }
+    public SourceLocation Location { get; }
+}
+
 internal sealed class FunctionParallelInfo
 {
     private FunctionParallelInfo(bool canRunParallel, string? reasonIfNot)
@@ -245,6 +280,7 @@ internal sealed class ModuleSymbol
     public List<PrefabSymbol> Prefabs { get; } = [];
     public List<GlobalVariableSymbol> Globals { get; } = [];
     public List<FunctionSymbol> Functions { get; } = [];
+    public List<TaskSymbol> Tasks { get; } = [];
 }
 
 internal sealed class CompilationModel
@@ -258,6 +294,8 @@ internal sealed class CompilationModel
     public Dictionary<string, List<ComponentSymbol>> ComponentsByShortName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, PrefabSymbol> PrefabsByFullName { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, List<PrefabSymbol>> PrefabsByShortName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, TaskSymbol> TasksByFullName { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<TaskSymbol>> TasksByShortName { get; } = new(StringComparer.Ordinal);
     public HashSet<string> HiddenExternalSymbols { get; } = new(StringComparer.Ordinal);
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
     public List<string> ExternalHeaders { get; } = [];
@@ -337,5 +375,35 @@ internal sealed class CompilationModel
             return false;
 
         return PrefabsByShortName.TryGetValue(name, out var matches) && matches.Count > 1;
+    }
+
+    public TaskSymbol? ResolveTask(string name, ModuleSymbol? module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return TasksByFullName.TryGetValue(name, out var qualified) ? qualified : null;
+
+        if (module is not null)
+        {
+            var currentFullName = Qualify(module.Name, name);
+            if (TasksByFullName.TryGetValue(currentFullName, out var current))
+                return current;
+        }
+
+        return TasksByShortName.TryGetValue(name, out var matches) && matches.Count == 1 ? matches[0] : null;
+    }
+
+    public bool IsAmbiguousTaskName(string name, ModuleSymbol? module)
+    {
+        if (name.Contains('.', StringComparison.Ordinal))
+            return false;
+
+        if (module is not null)
+        {
+            var currentFullName = Qualify(module.Name, name);
+            if (TasksByFullName.ContainsKey(currentFullName))
+                return false;
+        }
+
+        return TasksByShortName.TryGetValue(name, out var matches) && matches.Count > 1;
     }
 }

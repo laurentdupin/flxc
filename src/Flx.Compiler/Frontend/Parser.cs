@@ -34,6 +34,7 @@ internal sealed class Parser
                         unit.Prefabs.Count > 0 ||
                         unit.Globals.Count > 0 ||
                         unit.Functions.Count > 0 ||
+                        unit.Tasks.Count > 0 ||
                         unit.Schedules.Count > 0)
                     {
                         _diagnostics.Report("FLX0403", "module declaration must appear before imports and declarations.", Current.Location);
@@ -46,6 +47,9 @@ internal sealed class Parser
                     break;
                 case TokenKind.ParallelKeyword:
                     unit.ParallelExternalCalls.Add(ParseParallelExternalDecl());
+                    break;
+                case TokenKind.TaskKeyword:
+                    unit.Tasks.Add(ParseTask());
                     break;
                 case TokenKind.ScheduleKeyword:
                     unit.Schedules.Add(ParseSchedule());
@@ -120,6 +124,46 @@ internal sealed class Parser
 
         Expect(TokenKind.Semicolon, "expected ';' after parallel declaration.");
         return new ParallelExternalDeclSyntax(alias.Text, member.Text, parallelToken.Location, targetLocation);
+    }
+
+    private TaskDeclSyntax ParseTask()
+    {
+        var taskToken = Expect(TokenKind.TaskKeyword, "expected 'task'.");
+        var returnType = ParseTypeName("expected task return type.");
+        var name = ExpectIdentifier("expected task name.");
+
+        Expect(TokenKind.LeftParen, "expected '(' after task name.");
+        var parameters = ParseParameterList();
+        Expect(TokenKind.RightParen, "expected ')' after task parameters.");
+
+        var effects = ParseOptionalEffectsClause();
+        var (bodyText, bodyStart) = ParseRawBlock("expected task body.", "unterminated task body.");
+        return new TaskDeclSyntax(returnType, name.Text, parameters, effects, bodyText, bodyStart, taskToken.Location, name.Location);
+    }
+
+    private IReadOnlyList<string> ParseOptionalEffectsClause()
+    {
+        if (Current.Kind != TokenKind.EffectsKeyword)
+            return [];
+
+        Advance();
+        Expect(TokenKind.LeftParen, "expected '(' after 'effects'.");
+
+        var effects = new List<string>();
+        while (Current.Kind != TokenKind.RightParen && Current.Kind != TokenKind.EndOfFile)
+        {
+            var effect = ExpectIdentifier("expected effect name.");
+            if (!string.IsNullOrWhiteSpace(effect.Text))
+                effects.Add(effect.Text);
+
+            if (Current.Kind != TokenKind.Comma)
+                break;
+
+            Advance();
+        }
+
+        Expect(TokenKind.RightParen, "expected ')' after effects list.");
+        return effects;
     }
 
     private void ParseExportedDeclaration(CompilationUnitSyntax unit)

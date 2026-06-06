@@ -30,6 +30,7 @@ public enum FlxSymbolKind
     Prefab,
     Function,
     Method,
+    Task,
     Global,
     Schedule
 }

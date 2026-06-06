@@ -1,0 +1,13 @@
+component ZombieData {
+    i32 x = 0;
+}
+
+prefab Zombie {
+    flatten ZombieData;
+}
+
+task void LoadWorld()
+effects(blocking_io)
+{
+    Zombie z = create Zombie;
+}

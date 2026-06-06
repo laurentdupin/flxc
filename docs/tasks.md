@@ -49,23 +49,27 @@ On Windows, file loading runs on a background thread. On non-Windows targets, th
 - The task owner must call `flx_task_destroy_file` after completion or cancellation.
 - `flx_task_file_data` is owned by the task and becomes invalid after destroy.
 
-## Next Syntax Direction
+## Task Declarations
 
-The runtime API is a stepping stone toward language-level task declarations:
+FLX source can now declare background task shapes:
 
 ```flx
 task Buffer LoadFile(string path)
-effects(blocking_io)
+effects(blocking_io, asset_decode)
 {
     ...
 }
-
-void RequestAssets() {
-    start LoadFile("data/level.bin");
-}
 ```
 
-The language form should keep the same rules: tasks may block, tasks return results or completion events, and tasks do not directly mutate live world storage.
+The `effects(...)` clause is optional and records declared task effects in module metadata. This first syntax slice does not generate C for task bodies and does not provide `start`/completion syntax yet. Tasks are also not valid `schedule run` targets; the frame schedule still runs ordinary functions.
+
+Current task declaration rules:
+
+- task bodies must not `create`, `destroy`, or `reparent` live world objects
+- task parameters must not be prefab/object view types
+- task declarations are emitted to module metadata as `tasks`
+
+The language form keeps the same long-term rule as the runtime API: tasks may block, tasks return results or completion events, and scheduled code applies those results at frame-step boundaries.
 
 ## Open Work
 
@@ -73,4 +77,4 @@ The language form should keep the same rules: tasks may block, tasks return resu
 - Cancellation and timeout support.
 - Completion events consumed by schedule steps.
 - Asset handles with non-blocking `try_get` behavior.
-- Explicit diagnostics for illegal world mutation from task bodies once task syntax exists.
+- Code generation for starting task declarations and consuming completions.

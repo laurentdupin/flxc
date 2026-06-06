@@ -10,6 +10,7 @@ internal sealed class ModuleMetadata
     public List<CImportMetadata> CImports { get; set; } = [];
     public List<ComponentMetadata> Components { get; set; } = [];
     public List<PrefabMetadata> Prefabs { get; set; } = [];
+    public List<TaskMetadata> Tasks { get; set; } = [];
     public ScheduleMetadata? Schedule { get; set; }
 }
 
@@ -38,6 +39,17 @@ internal sealed class CImportMetadata
 {
     public string Header { get; set; } = "";
     public string Alias { get; set; } = "";
+}
+
+internal sealed class TaskMetadata
+{
+    public string SourceName { get; set; } = "";
+    public string FullName { get; set; } = "";
+    public string ReturnType { get; set; } = "";
+    public List<ParameterMetadata> Parameters { get; set; } = [];
+    public List<string> Effects { get; set; } = [];
+    public int Line { get; set; }
+    public int Column { get; set; }
 }
 
 internal sealed class ComponentMetadata

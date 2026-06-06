@@ -159,6 +159,60 @@ public sealed class CompilerFixtureTests
         Assert.Contains("Move: parallelizable", mutating.Output);
     }
 
+    [Fact]
+    public async Task TaskDeclaration_EmitsMetadataWithoutCBody()
+    {
+        using var output = TemporaryOutputDirectory.Create();
+
+        var result = await RunCompilerAsync(output.Path, "task_declaration.flx", true, "--no-main");
+
+        AssertSuccess(result);
+
+        using var metadata = ReadSingleMetadata(output.Path);
+        var task = Assert.Single(metadata.RootElement.GetProperty("tasks").EnumerateArray());
+
+        Assert.Equal("LoadFile", task.GetProperty("sourceName").GetString());
+        Assert.Equal("LoadFile", task.GetProperty("fullName").GetString());
+        Assert.Equal("Buffer", task.GetProperty("returnType").GetString());
+
+        var parameters = task.GetProperty("parameters").EnumerateArray().ToArray();
+        var parameter = Assert.Single(parameters);
+        Assert.Equal("string", parameter.GetProperty("type").GetString());
+        Assert.Equal("path", parameter.GetProperty("name").GetString());
+
+        Assert.Equal(
+            new[] { "blocking_io", "asset_decode" },
+            task.GetProperty("effects").EnumerateArray().Select(effect => effect.GetString()!).ToArray());
+
+        var moduleSource = await File.ReadAllTextAsync(Path.Combine(output.Path, "task_declaration.flx.g.c"));
+        Assert.DoesNotContain("LoadFile", moduleSource);
+    }
+
+    [Theory]
+    [InlineData("task_mutates_world.flx", "FLX0802")]
+    [InlineData("task_prefab_parameter.flx", "FLX0803")]
+    public async Task InvalidTaskDeclarations_EmitExpectedDiagnostics(string fixtureName, string diagnosticCode)
+    {
+        using var output = TemporaryOutputDirectory.Create();
+
+        var result = await RunCompilerAsync(output.Path, fixtureName, true, "--no-main");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(diagnosticCode, result.Output);
+    }
+
+    [Fact]
+    public async Task ScheduledTask_EmitsTaskSpecificDiagnostic()
+    {
+        using var output = TemporaryOutputDirectory.Create();
+
+        var result = await RunCompilerAsync(output.Path, "task_scheduled.flx");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("FLX0804", result.Output);
+        Assert.DoesNotContain("FLX0101", result.Output);
+    }
+
     private static async Task<CompilerResult> RunCompilerAsync(
         string outputDirectory,
         string fixtureName,

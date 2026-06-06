@@ -52,6 +52,9 @@ internal sealed class SemanticAnalyzer
         foreach (var module in model.Modules)
             BindGlobals(module.Syntax, module, model);
 
+        foreach (var module in model.Modules)
+            BindTasks(module.Syntax, module, model);
+
         BindExternalFunctions(model, externalPackages ?? [], model.FunctionRegistry);
 
         foreach (var module in model.Modules)
@@ -328,6 +331,80 @@ internal sealed class SemanticAnalyzer
         }
     }
 
+    private void BindTasks(CompilationUnitSyntax unit, ModuleSymbol module, CompilationModel model)
+    {
+        foreach (var task in unit.Tasks)
+        {
+            if (CheckReservedProgramArgumentSymbol(task.Name, task.NameLocation))
+                continue;
+
+            var returnType = ResolveTypeName(task.ReturnType, module, model, task.DeclarationLocation);
+            var parameters = task.Parameters
+                .Select(parameter => new ParameterSymbol(ResolveTypeName(parameter.Type, module, model, parameter.Location), parameter.Name, parameter.Location))
+                .ToArray();
+
+            foreach (var parameter in parameters)
+            {
+                CheckReservedProgramArgumentSymbol(parameter.Name, parameter.Location);
+                if (model.PrefabsByFullName.ContainsKey(parameter.Type))
+                {
+                    _diagnostics.Report(
+                        "FLX0803",
+                        $"task '{task.Name}' cannot accept prefab parameter '{parameter.Name}'; tasks cannot capture live world object views.",
+                        parameter.Location);
+                }
+            }
+
+            var fullName = CompilationModel.Qualify(module.Name, task.Name);
+            if (model.TasksByFullName.ContainsKey(fullName))
+            {
+                _diagnostics.Report("FLX0801", $"duplicate task '{fullName}'.", task.NameLocation);
+                continue;
+            }
+
+            var symbol = new TaskSymbol(
+                module,
+                unit.Source,
+                task,
+                task.Name,
+                fullName,
+                returnType,
+                parameters,
+                task.Effects,
+                task.NameLocation);
+
+            module.Tasks.Add(symbol);
+            model.TasksByFullName.Add(symbol.FullName, symbol);
+            AddByShortName(model.TasksByShortName, symbol.SourceName, symbol);
+            CheckTaskBodySafety(symbol);
+        }
+    }
+
+    private void CheckTaskBodySafety(TaskSymbol task)
+    {
+        if (TryReportTaskWorldMutation(task, @"\bcreate\s+[A-Za-z_]", "create live world objects"))
+            return;
+
+        if (TryReportTaskWorldMutation(task, @"\bdestroy\s+[A-Za-z_]", "destroy live world objects"))
+            return;
+
+        TryReportTaskWorldMutation(task, @"\breparent\s+[A-Za-z_]", "reparent live world objects");
+    }
+
+    private bool TryReportTaskWorldMutation(TaskSymbol task, string pattern, string action)
+    {
+        var match = Regex.Match(task.Syntax.BodyText, pattern, RegexOptions.Multiline);
+        if (!match.Success)
+            return false;
+
+        var location = task.SourceFile.GetLocation(task.Syntax.BodyStart + match.Index);
+        _diagnostics.Report(
+            "FLX0802",
+            $"task '{task.SourceName}' cannot {action}; background tasks must return results for scheduled code to apply.",
+            location);
+        return true;
+    }
+
     private void BindExternalFunctions(
         CompilationModel model,
         IReadOnlyList<PackageMetadata> externalPackages,
@@ -588,6 +665,15 @@ internal sealed class SemanticAnalyzer
 
             if (resolution.Functions.Count == 0)
             {
+                if (TargetMatchesTask(model, runStep, scheduleModule))
+                {
+                    _diagnostics.Report(
+                        "FLX0804",
+                        $"schedule target '{runStep.Name}' resolves to a background task; tasks cannot be scheduled as frame steps yet.",
+                        runStep.Location);
+                    continue;
+                }
+
                 var message = resolution.IsWildcard
                     ? $"wildcard schedule target '{runStep.Name}' matched no function groups."
                     : $"run target '{runStep.Name}' does not exist.";
@@ -606,6 +692,41 @@ internal sealed class SemanticAnalyzer
 
         CheckDuplicateRunTargets(model);
         CheckScheduleLabels(model.Schedules[0]);
+    }
+
+    private static bool TargetMatchesTask(CompilationModel model, RunStepSyntax runStep, ModuleSymbol? scheduleModule)
+    {
+        if (!runStep.Target.HasWildcard)
+            return model.ResolveTask(runStep.Name, scheduleModule) is not null ||
+                   model.IsAmbiguousTaskName(runStep.Name, scheduleModule);
+
+        return model.TasksByFullName.Values.Any(task => TaskMatchesTarget(runStep.Target, task));
+    }
+
+    private static bool TaskMatchesTarget(ScheduleTargetSyntax target, TaskSymbol task)
+    {
+        if (target.Segments.Count == 2 &&
+            target.Segments[0].IsWildcard &&
+            !target.Segments[1].IsWildcard)
+        {
+            return string.Equals(task.SourceName, target.Segments[1].Text, StringComparison.Ordinal);
+        }
+
+        var taskSegments = task.FullName.Split('.');
+        if (taskSegments.Length != target.Segments.Count)
+            return false;
+
+        for (var index = 0; index < target.Segments.Count; index++)
+        {
+            var segment = target.Segments[index];
+            if (segment.IsWildcard)
+                continue;
+
+            if (!string.Equals(segment.Text, taskSegments[index], StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
     }
 
     private void CheckDuplicateRunTargets(CompilationModel model)

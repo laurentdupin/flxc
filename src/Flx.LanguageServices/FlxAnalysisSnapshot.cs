@@ -8,6 +8,8 @@ public sealed class FlxAnalysisSnapshot
         new("import", FlxCompletionKind.Keyword, insertText: "import c \"\" as "),
         new("export", FlxCompletionKind.Keyword),
         new("parallel", FlxCompletionKind.Keyword),
+        new("task", FlxCompletionKind.Keyword, insertText: "task void Name()\neffects()\n{\n    \n}"),
+        new("effects", FlxCompletionKind.Keyword),
         new("component", FlxCompletionKind.Keyword),
         new("prefab", FlxCompletionKind.Keyword),
         new("schedule", FlxCompletionKind.Keyword, insertText: "schedule {\n    run \n}"),
@@ -426,6 +428,7 @@ public sealed class FlxAnalysisSnapshot
         return kind is FlxSymbolKind.Module or
                FlxSymbolKind.Component or
                FlxSymbolKind.Prefab or
+               FlxSymbolKind.Task or
                FlxSymbolKind.Function or
                FlxSymbolKind.Method or
                FlxSymbolKind.Global;
@@ -440,7 +443,8 @@ public sealed class FlxAnalysisSnapshot
             FlxSymbolKind.Component => 2,
             FlxSymbolKind.Global => 3,
             FlxSymbolKind.Function => 4,
-            FlxSymbolKind.Method => 5,
+            FlxSymbolKind.Task => 5,
+            FlxSymbolKind.Method => 6,
             _ => 10
         };
     }
@@ -452,6 +456,7 @@ public sealed class FlxAnalysisSnapshot
             FlxSymbolKind.Module => FlxCompletionKind.Module,
             FlxSymbolKind.Component => FlxCompletionKind.Component,
             FlxSymbolKind.Prefab => FlxCompletionKind.Prefab,
+            FlxSymbolKind.Task => FlxCompletionKind.Function,
             FlxSymbolKind.Function => FlxCompletionKind.Function,
             FlxSymbolKind.Method => FlxCompletionKind.Method,
             FlxSymbolKind.Global => FlxCompletionKind.Global,

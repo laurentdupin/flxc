@@ -1,0 +1,4 @@
+task Buffer LoadFile(string path)
+effects(blocking_io, asset_decode)
+{
+}

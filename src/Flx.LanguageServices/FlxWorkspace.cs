@@ -260,6 +260,9 @@ public sealed class FlxWorkspace
                 yield return CreateSymbol(function.SourceName, kind, function.SourceFile.FullPath, function.Syntax.NameLocation, FormatFunctionDetail(function));
             }
 
+            foreach (var task in module.Tasks)
+                yield return CreateSymbol(task.SourceName, FlxSymbolKind.Task, task.SourceFile.FullPath, task.Syntax.NameLocation, FormatTaskDetail(task));
+
             foreach (var schedule in module.Syntax.Schedules)
                 yield return CreateSymbol("schedule", FlxSymbolKind.Schedule, module.SourceFile.FullPath, schedule.Location, null);
         }
@@ -324,6 +327,15 @@ public sealed class FlxWorkspace
                     function.Syntax.NameLocation,
                 function.SourceName.Length);
             }
+
+            foreach (var task in module.Tasks)
+                definitions[TaskKey(task.FullName)] = CreateDefinition(
+                    TaskKey(task.FullName),
+                    task.FullName,
+                    FlxSymbolKind.Task,
+                    task.SourceFile.FullPath,
+                    task.Syntax.NameLocation,
+                    task.SourceName.Length);
         }
 
         AddBinaryPackageDefinitions(packageGraph, definitions);
@@ -489,6 +501,9 @@ public sealed class FlxWorkspace
             foreach (var function in module.Functions)
                 infos[FunctionKey(function)] = CreateFunctionInfo(function);
 
+            foreach (var task in module.Tasks)
+                infos[TaskKey(task.FullName)] = CreateTaskInfo(task);
+
             foreach (var parallel in module.ParallelExternalCalls)
             {
                 var key = ParallelExternalKey(module.SourceFile.FullPath, parallel.FullName);
@@ -587,6 +602,21 @@ public sealed class FlxWorkspace
             PackageName = function.SourceFile.PackageName,
             ModuleName = function.Module.Name,
             SourcePath = function.SourceFile.FullPath
+        };
+    }
+
+    private static FlxSymbolInfo CreateTaskInfo(TaskSymbol task)
+    {
+        return new FlxSymbolInfo
+        {
+            Key = TaskKey(task.FullName),
+            FullName = task.FullName,
+            Kind = FlxSymbolKind.Task,
+            Display = FormatTaskDetail(task),
+            Detail = task.Effects.Count == 0 ? null : "effects " + string.Join(", ", task.Effects),
+            PackageName = task.SourceFile.PackageName,
+            ModuleName = task.Module.Name,
+            SourcePath = task.SourceFile.FullPath
         };
     }
 
@@ -715,6 +745,9 @@ public sealed class FlxWorkspace
 
             foreach (var function in module.Functions)
                 CollectFunctionReferences(model, module, function, references);
+
+            foreach (var task in module.Tasks)
+                CollectTaskReferences(model, module, task, references);
         }
 
         return references;
@@ -775,6 +808,15 @@ public sealed class FlxWorkspace
                 function.FullName,
                 kind));
         }
+
+        foreach (var task in module.Tasks)
+            references.Add(CreateReference(
+                task.SourceFile.FullPath,
+                RangeFromLocation(task.Syntax.NameLocation, task.SourceName.Length),
+                FlxReferenceKind.Declaration,
+                TaskKey(task.FullName),
+                task.FullName,
+                FlxSymbolKind.Task));
     }
 
     private static void CollectParallelExternalReferences(ModuleSymbol module, List<FlxReference> references)
@@ -954,6 +996,19 @@ public sealed class FlxWorkspace
                 method.FullName,
                 FlxSymbolKind.Method));
         }
+    }
+
+    private static void CollectTaskReferences(
+        CompilationModel model,
+        ModuleSymbol module,
+        TaskSymbol task,
+        List<FlxReference> references)
+    {
+        var signatureStart = LineStartBefore(task.SourceFile.Text, task.Syntax.NameLocation.Position);
+        var signatureEnd = task.Syntax.BodyStart;
+        AddTypeReferences(task.SourceFile, module, model, task.Syntax.ReturnType, signatureStart, signatureEnd, references);
+        foreach (var parameter in task.Syntax.Parameters)
+            AddTypeReferences(task.SourceFile, module, model, parameter.Type, signatureStart, signatureEnd, references);
     }
 
     private static void AddTypeReferences(
@@ -1248,6 +1303,7 @@ public sealed class FlxWorkspace
     private static string ModuleKey(string fullName) => "module:" + fullName;
     private static string ParallelExternalKey(string path, string fullName) => "parallel-external:" + Path.GetFullPath(path) + ":" + fullName;
     private static string PrefabKey(string fullName) => "prefab:" + fullName;
+    private static string TaskKey(string fullName) => "task:" + fullName;
 
     private static FlxDocumentSymbol CreateSymbol(
         string name,
@@ -1266,6 +1322,12 @@ public sealed class FlxWorkspace
         var parameters = string.Join(", ", function.Parameters.Select(parameter => $"{parameter.Type} {parameter.Name}"));
         var prefix = function.ReceiverType is null ? "function" : "method";
         return $"{prefix} {function.ReturnType} {function.FullName}({parameters})";
+    }
+
+    private static string FormatTaskDetail(TaskSymbol task)
+    {
+        var parameters = string.Join(", ", task.Parameters.Select(parameter => $"{parameter.Type} {parameter.Name}"));
+        return $"task {task.ReturnType} {task.FullName}({parameters})";
     }
 
     private static string FormatFunctionMetadata(FunctionMetadata function)

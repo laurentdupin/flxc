@@ -17,6 +17,8 @@ internal enum TokenKind
     LoopToKeyword,
     ExportKeyword,
     ParallelKeyword,
+    TaskKeyword,
+    EffectsKeyword,
     ComponentKeyword,
     PrefabKeyword,
     LeftParen,

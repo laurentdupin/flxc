@@ -249,6 +249,7 @@ internal static class LspTypeConversions
             FlxSymbolKind.Prefab => SymbolKind.Class,
             FlxSymbolKind.Function => SymbolKind.Function,
             FlxSymbolKind.Method => SymbolKind.Method,
+            FlxSymbolKind.Task => SymbolKind.Function,
             FlxSymbolKind.Global => SymbolKind.Variable,
             FlxSymbolKind.Schedule => SymbolKind.Event,
             _ => SymbolKind.Namespace

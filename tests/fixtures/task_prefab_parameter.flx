@@ -1,0 +1,12 @@
+component ZombieData {
+    i32 x = 0;
+}
+
+prefab Zombie {
+    flatten ZombieData;
+}
+
+task void Analyze(Zombie zombie)
+effects(blocking_io)
+{
+}

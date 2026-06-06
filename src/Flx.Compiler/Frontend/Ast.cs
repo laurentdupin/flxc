@@ -17,6 +17,7 @@ internal sealed class CompilationUnitSyntax
     public List<PrefabDeclSyntax> Prefabs { get; } = [];
     public List<GlobalVariableDeclSyntax> Globals { get; } = [];
     public List<FunctionDeclSyntax> Functions { get; } = [];
+    public List<TaskDeclSyntax> Tasks { get; } = [];
     public List<ScheduleDeclSyntax> Schedules { get; } = [];
 }
 
@@ -97,6 +98,38 @@ internal sealed class FunctionDeclSyntax
     public SourceLocation DeclarationLocation { get; }
     public SourceLocation NameLocation { get; }
     public bool IsExported { get; }
+}
+
+internal sealed class TaskDeclSyntax
+{
+    public TaskDeclSyntax(
+        string returnType,
+        string name,
+        IReadOnlyList<ParameterSyntax> parameters,
+        IReadOnlyList<string> effects,
+        string bodyText,
+        int bodyStart,
+        SourceLocation declarationLocation,
+        SourceLocation nameLocation)
+    {
+        ReturnType = returnType;
+        Name = name;
+        Parameters = parameters;
+        Effects = effects;
+        BodyText = bodyText;
+        BodyStart = bodyStart;
+        DeclarationLocation = declarationLocation;
+        NameLocation = nameLocation;
+    }
+
+    public string ReturnType { get; }
+    public string Name { get; }
+    public IReadOnlyList<ParameterSyntax> Parameters { get; }
+    public IReadOnlyList<string> Effects { get; }
+    public string BodyText { get; }
+    public int BodyStart { get; }
+    public SourceLocation DeclarationLocation { get; }
+    public SourceLocation NameLocation { get; }
 }
 
 internal sealed class GlobalVariableDeclSyntax
