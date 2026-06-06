@@ -74,6 +74,29 @@ public sealed class CompilerFixtureTests
         Assert.Contains("FLX0703", result.Output);
     }
 
+    [Fact]
+    public async Task NumericComponentFields_EmitDirectFieldStorage()
+    {
+        using var output = TemporaryOutputDirectory.Create();
+
+        var result = await RunCompilerAsync(output.Path, "numeric_component_fields.flx");
+
+        AssertSuccess(result);
+
+        var runtimeSource = await File.ReadAllTextAsync(Path.Combine(output.Path, "flx_runtime.g.c"));
+        Assert.Contains(".x = 3;", runtimeSource);
+        Assert.Contains(".y = 4;", runtimeSource);
+        Assert.Contains(".energy = 5;", runtimeSource);
+
+        var moduleSource = await File.ReadAllTextAsync(Path.Combine(output.Path, "numeric_component_fields.flx.g.c"));
+        Assert.Contains(".x = agent.ptr->AgentData.x + i;", moduleSource);
+        Assert.Contains(".y = agent.ptr->AgentData.y + (i * 2);", moduleSource);
+        Assert.Contains(".energy = agent.ptr->AgentData.energy + (usize)i;", moduleSource);
+        Assert.Contains("agent.ptr->AgentData.x", moduleSource);
+        Assert.Contains("agent.ptr->AgentData.y", moduleSource);
+        Assert.Contains("agent.ptr->AgentData.energy", moduleSource);
+    }
+
     private static async Task<CompilerResult> RunCompilerAsync(string outputDirectory, string fixtureName)
     {
         var repositoryRoot = FindRepositoryRoot();

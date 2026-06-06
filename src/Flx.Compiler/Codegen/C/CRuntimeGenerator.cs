@@ -485,6 +485,9 @@ internal sealed class CRuntimeGenerator
                 else
                     builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.FullName)}.{field.Name} = flx_string_empty();");
             }
+
+            foreach (var field in component.Fields.Where(field => field.Type is "i32" or "usize"))
+                builder.AppendLine($"    item->{CTypeNames.SafeIdentifier(component.FullName)}.{field.Name} = {FormatNumericDefault(field)};");
         }
         builder.AppendLine($"    world->{CTypeNames.CountField(prefab.FullName)}++;");
         builder.AppendLine($"    {CTypeNames.ViewType(prefab.FullName)} view = {{ item }};");
@@ -515,5 +518,15 @@ internal sealed class CRuntimeGenerator
         }
 
         return length;
+    }
+
+    private static string FormatNumericDefault(ComponentFieldSymbol field)
+    {
+        if (field.DefaultValue is not { Length: > 0 } defaultValue)
+            return "0";
+
+        return field.Type == "usize" && defaultValue.EndsWith("u", StringComparison.OrdinalIgnoreCase)
+            ? defaultValue[..^1]
+            : defaultValue;
     }
 }

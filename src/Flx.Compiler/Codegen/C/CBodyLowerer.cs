@@ -119,6 +119,12 @@ internal sealed class CBodyLowerer
         {
             var valueText = fieldAssignment.Groups["value"].Value.Trim();
             var fieldTarget = $"&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name}";
+            if (field.Field.Type is "i32" or "usize")
+            {
+                builder.AppendLine($"{indent}{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name} = {LowerExpression(valueText, scope)};");
+                return;
+            }
+
             if (IsStringLiteral(valueText))
             {
                 var temporaryName = NextTemporaryName();
@@ -176,6 +182,20 @@ internal sealed class CBodyLowerer
             {
                 if (TryResolvePrefabField(scope, match.Groups["target"].Value, match.Groups["field"].Value, out var target, out var field))
                     return $"flx_string_c_str(&{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name})";
+
+                return match.Value;
+            });
+
+        lowered = Regex.Replace(
+            lowered,
+            @"\b(?<target>[A-Za-z_][A-Za-z0-9_]*)\.(?<field>[A-Za-z_][A-Za-z0-9_]*)\b",
+            match =>
+            {
+                if (TryResolvePrefabField(scope, match.Groups["target"].Value, match.Groups["field"].Value, out var target, out var field) &&
+                    field.Field.Type is "i32" or "usize")
+                {
+                    return $"{target}.ptr->{CTypeNames.SafeIdentifier(field.Component.FullName)}.{field.Field.Name}";
+                }
 
                 return match.Value;
             });

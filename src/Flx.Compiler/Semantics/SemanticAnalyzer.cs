@@ -125,7 +125,7 @@ internal sealed class SemanticAnalyzer
         var fields = new List<ComponentFieldSymbol>();
         var content = StripOuterBlock(component.BodyText);
         var pattern = new Regex(
-            @"(?<type>[A-Za-z_][A-Za-z0-9_]*)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*(?<default>""(?:\\.|[^""\\])*""))?\s*;",
+            @"(?<type>[A-Za-z_][A-Za-z0-9_]*)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*(?<default>""(?:\\.|[^""\\])*""|-?\d+[uU]?))?\s*;",
             RegexOptions.Multiline);
 
         foreach (Match match in pattern.Matches(content))
@@ -135,7 +135,7 @@ internal sealed class SemanticAnalyzer
             var defaultValue = match.Groups["default"].Success ? match.Groups["default"].Value : null;
             var location = sourceFile.GetLocation(component.BodyStart + 1 + match.Groups["name"].Index);
 
-            if (type != "string")
+            if (type is not ("string" or "i32" or "usize"))
                 _diagnostics.Report("FLX0303", $"component field type '{type}' is not implemented yet.", location);
 
             fields.Add(new ComponentFieldSymbol(type, name, defaultValue, location));

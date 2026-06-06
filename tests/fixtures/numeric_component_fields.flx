@@ -1,0 +1,29 @@
+import c "stdio.h" as stdio
+
+component AgentData {
+    i32 x = 3;
+    i32 y = 4;
+    usize energy = 5;
+}
+
+prefab Agent {
+    flatten AgentData;
+}
+
+void CreateAgents() {
+    for (i32 i = 0; i < 3; ++i) {
+        Agent agent = create Agent;
+        agent.x = agent.x + i;
+        agent.y = agent.y + (i * 2);
+        agent.energy = agent.energy + (usize)i;
+    }
+}
+
+void PrintAgent(Agent agent) {
+    stdio.printf("agent %zu %d %d %zu\n", agent.ptr->id, agent.x, agent.y, agent.energy);
+}
+
+schedule {
+    run CreateAgents;
+    run PrintAgent;
+}
