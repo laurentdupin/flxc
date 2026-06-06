@@ -1,0 +1,18 @@
+component ZombieData {
+    string name = "";
+}
+
+prefab Zombie {
+    flatten ZombieData;
+}
+
+void CreateZombies() {
+    for (i32 i = 0; i < 10; ++i) {
+        Zombie z = create Zombie;
+        z.name = "Marcus " + (i + 1);
+    }
+}
+
+schedule {
+    run CreateZombies;
+}
