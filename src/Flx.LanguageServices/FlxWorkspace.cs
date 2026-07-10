@@ -11,8 +11,8 @@ public sealed class FlxWorkspace
 {
     private const string QualifiedNamePattern = @"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*";
 
-    private static readonly Regex FlattenReferenceRegex = new(
-        @"\bflatten\s+(?<name>" + QualifiedNamePattern + @")\s*;",
+    private static readonly Regex PrefabComponentReferenceRegex = new(
+        @"\b(?:flatten\s+(?<flattenName>" + QualifiedNamePattern + @")|(?<memberType>" + QualifiedNamePattern + @")\s+(?<memberName>[A-Za-z_][A-Za-z0-9_]*))\s*;",
         RegexOptions.Multiline);
 
     private static readonly Regex CreateReferenceRegex = new(
@@ -480,7 +480,7 @@ public sealed class FlxWorkspace
                     FullName = prefab.FullName,
                     Kind = FlxSymbolKind.Prefab,
                     Display = $"prefab {prefab.FullName}",
-                    Detail = FormatFlattenedComponents(prefab.FlattenedComponents),
+                    Detail = FormatPrefabComponents(prefab.FlattenedComponents),
                     PackageName = prefab.SourceFile.PackageName,
                     ModuleName = module.Name,
                     SourcePath = prefab.SourceFile.FullPath
@@ -564,7 +564,7 @@ public sealed class FlxWorkspace
                     Display = $"prefab {prefab.FullName}",
                     Detail = prefab.FlattenedComponents.Count == 0
                         ? null
-                        : "flattens " + string.Join(", ", prefab.FlattenedComponents),
+                        : "components: " + string.Join(", ", prefab.FlattenedComponents),
                     PackageName = package.Name,
                     ModuleName = ModuleNameFromFullName(prefab.FullName, prefab.Name),
                     SourcePath = ResolveBinaryPackageSourcePath(package, prefab.Source) ?? package.MetadataPath
@@ -628,12 +628,12 @@ public sealed class FlxWorkspace
         return string.Join("\n", fields.Select(field => $"field {field.Name} : {field.Type}"));
     }
 
-    private static string? FormatFlattenedComponents(IReadOnlyList<ComponentSymbol> components)
+    private static string? FormatPrefabComponents(IReadOnlyList<ComponentSymbol> components)
     {
         if (components.Count == 0)
             return null;
 
-        return "flattens " + string.Join(", ", components.Select(component => component.FullName));
+        return "components: " + string.Join(", ", components.Select(component => component.FullName));
     }
 
     private static IEnumerable<FlxFunctionScope> CollectFunctionScopes(CompilationModel model)
@@ -884,14 +884,17 @@ public sealed class FlxWorkspace
         List<FlxReference> references)
     {
         var content = StripOuterBlock(prefab.Syntax.BodyText);
-        foreach (Match match in FlattenReferenceRegex.Matches(content))
+        foreach (Match match in PrefabComponentReferenceRegex.Matches(content))
         {
-            var componentName = match.Groups["name"].Value;
+            var nameGroup = match.Groups["flattenName"].Success
+                ? match.Groups["flattenName"]
+                : match.Groups["memberType"];
+            var componentName = nameGroup.Value;
             var component = model.ResolveComponent(componentName, module);
             if (component is null)
                 continue;
 
-            var location = module.SourceFile.GetLocation(prefab.Syntax.BodyStart + 1 + match.Groups["name"].Index);
+            var location = module.SourceFile.GetLocation(prefab.Syntax.BodyStart + 1 + nameGroup.Index);
             references.Add(CreateReference(
                 module.SourceFile.FullPath,
                 RangeFromLocation(location, componentName.Length),

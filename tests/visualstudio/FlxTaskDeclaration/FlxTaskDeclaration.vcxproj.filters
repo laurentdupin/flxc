@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{28D65EE2-FF6B-4970-80BF-A8BE116C4C83}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxCompile Include="..\..\fixtures\task_declaration.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxCompile>
+    <FlxSource Include="..\..\fixtures\task_mutates_world.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxSource>
+    <FlxSource Include="..\..\fixtures\task_prefab_parameter.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxSource>
+    <FlxSource Include="..\..\fixtures\task_scheduled.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxSource>
+    <FlxSource Include="..\..\fixtures\task_file_load.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxSource>
+  </ItemGroup>
+</Project>

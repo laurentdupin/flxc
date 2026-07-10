@@ -14,14 +14,14 @@
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
     <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
-    <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
+    <MinimumVisualStudioVersion>18.0</MinimumVisualStudioVersion>
     <VsixType>v3</VsixType>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="18.5.40034" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.14.60" PrivateAssets="all" />
   </ItemGroup>
 
@@ -55,6 +55,40 @@
 
   <Target Name="FlxRefreshVsixManifest">
     <Delete Files="$(IntermediateVsixManifest)" />
+  </Target>
+
+  <PropertyGroup>
+    <FlxLastVsixVersionFile>$(BaseIntermediateOutputPath)last-vsix-version.txt</FlxLastVsixVersionFile>
+  </PropertyGroup>
+
+  <Target Name="FlxReadVsixManifestVersion">
+    <XmlPeek
+      XmlInputPath="source.extension.vsixmanifest"
+      Query="/*[local-name()='PackageManifest']/*[local-name()='Metadata']/*[local-name()='Identity']/@Version">
+      <Output TaskParameter="Result" PropertyName="FlxCurrentVsixVersion" />
+    </XmlPeek>
+  </Target>
+
+  <Target Name="FlxEnsureVsixVersionWasBumped"
+          BeforeTargets="CreateVsixContainer"
+          DependsOnTargets="FlxReadVsixManifestVersion"
+          Condition="'$(CreateVsixContainer)' == 'true'">
+    <ReadLinesFromFile File="$(FlxLastVsixVersionFile)" Condition="Exists('$(FlxLastVsixVersionFile)')">
+      <Output TaskParameter="Lines" PropertyName="FlxLastVsixVersion" />
+    </ReadLinesFromFile>
+    <Error
+      Condition="'$(FlxLastVsixVersion)' != '' and '$(FlxLastVsixVersion)' == '$(FlxCurrentVsixVersion)'"
+      Text="VSIX version $(FlxCurrentVsixVersion) was already packaged by the previous VSIX build. Increment Identity/@Version in source.extension.vsixmanifest before rebuilding so Visual Studio can install the update." />
+  </Target>
+
+  <Target Name="FlxRememberVsixVersion"
+          AfterTargets="CreateVsixContainer"
+          DependsOnTargets="FlxReadVsixManifestVersion"
+          Condition="'$(CreateVsixContainer)' == 'true' and Exists('$(TargetVsixContainer)')">
+    <WriteLinesToFile
+      File="$(FlxLastVsixVersionFile)"
+      Lines="$(FlxCurrentVsixVersion)"
+      Overwrite="true" />
   </Target>
 
   <PropertyGroup>

@@ -15,13 +15,17 @@ component AgentData {
 }
 ```
 
-Prefabs flatten one or more components into an object shape:
+Prefabs include one or more components in an object shape:
 
 ```flx
 prefab Agent {
-    flatten AgentData;
+    AgentData data;
 }
 ```
+
+`flatten Component;` is also accepted for explicit direct field exposure. The
+current runtime exposes component fields directly either way, so both forms allow
+`agent.x` style access.
 
 `create Agent` appends an object to generated world storage and returns a temporary view:
 

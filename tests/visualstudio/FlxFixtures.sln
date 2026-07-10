@@ -1,0 +1,45 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11819.183
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "FlxFixtureBrowser", "FlxFixtureBrowser\FlxFixtureBrowser.vcxproj", "{E6F5A810-6AA0-4C70-B10F-83B6D6D16AA1}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "FlxNumericComponentFields", "FlxNumericComponentFields\FlxNumericComponentFields.vcxproj", "{4EC89002-03F7-47EF-B62D-2437F85C26C5}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "FlxParallelZombies", "FlxParallelZombies\FlxParallelZombies.vcxproj", "{73E2175D-94D1-4072-9156-9A537C159ED4}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "FlxParallelMutatingFields", "FlxParallelMutatingFields\FlxParallelMutatingFields.vcxproj", "{BA3CCF72-5A53-49D4-B8CF-53E1F75BA35A}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "FlxTaskDeclaration", "FlxTaskDeclaration\FlxTaskDeclaration.vcxproj", "{6181A05A-C4C4-461A-B9D5-0AD0C92A4E79}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E6F5A810-6AA0-4C70-B10F-83B6D6D16AA1}.Debug|x64.ActiveCfg = Debug|x64
+		{E6F5A810-6AA0-4C70-B10F-83B6D6D16AA1}.Debug|x64.Build.0 = Debug|x64
+		{E6F5A810-6AA0-4C70-B10F-83B6D6D16AA1}.Release|x64.ActiveCfg = Release|x64
+		{E6F5A810-6AA0-4C70-B10F-83B6D6D16AA1}.Release|x64.Build.0 = Release|x64
+		{4EC89002-03F7-47EF-B62D-2437F85C26C5}.Debug|x64.ActiveCfg = Debug|x64
+		{4EC89002-03F7-47EF-B62D-2437F85C26C5}.Debug|x64.Build.0 = Debug|x64
+		{4EC89002-03F7-47EF-B62D-2437F85C26C5}.Release|x64.ActiveCfg = Release|x64
+		{4EC89002-03F7-47EF-B62D-2437F85C26C5}.Release|x64.Build.0 = Release|x64
+		{73E2175D-94D1-4072-9156-9A537C159ED4}.Debug|x64.ActiveCfg = Debug|x64
+		{73E2175D-94D1-4072-9156-9A537C159ED4}.Debug|x64.Build.0 = Debug|x64
+		{73E2175D-94D1-4072-9156-9A537C159ED4}.Release|x64.ActiveCfg = Release|x64
+		{73E2175D-94D1-4072-9156-9A537C159ED4}.Release|x64.Build.0 = Release|x64
+		{BA3CCF72-5A53-49D4-B8CF-53E1F75BA35A}.Debug|x64.ActiveCfg = Debug|x64
+		{BA3CCF72-5A53-49D4-B8CF-53E1F75BA35A}.Debug|x64.Build.0 = Debug|x64
+		{BA3CCF72-5A53-49D4-B8CF-53E1F75BA35A}.Release|x64.ActiveCfg = Release|x64
+		{BA3CCF72-5A53-49D4-B8CF-53E1F75BA35A}.Release|x64.Build.0 = Release|x64
+		{6181A05A-C4C4-461A-B9D5-0AD0C92A4E79}.Debug|x64.ActiveCfg = Debug|x64
+		{6181A05A-C4C4-461A-B9D5-0AD0C92A4E79}.Debug|x64.Build.0 = Debug|x64
+		{6181A05A-C4C4-461A-B9D5-0AD0C92A4E79}.Release|x64.ActiveCfg = Release|x64
+		{6181A05A-C4C4-461A-B9D5-0AD0C92A4E79}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

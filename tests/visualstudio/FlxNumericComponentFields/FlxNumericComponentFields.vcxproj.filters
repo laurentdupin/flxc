@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FLX Source Files">
+      <UniqueIdentifier>{28F07EAB-799C-438A-B595-B8810B75ECF5}</UniqueIdentifier>
+      <Extensions>flx</Extensions>
+    </Filter>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlxCompile Include="..\..\fixtures\numeric_component_fields.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxCompile>
+    <FlxSource Include="..\..\fixtures\unsupported_concat.flx">
+      <Filter>FLX Source Files</Filter>
+    </FlxSource>
+  </ItemGroup>
+</Project>

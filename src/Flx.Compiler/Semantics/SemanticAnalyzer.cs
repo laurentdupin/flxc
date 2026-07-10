@@ -166,12 +166,17 @@ internal sealed class SemanticAnalyzer
 
             var flattened = new List<ComponentSymbol>();
             var content = StripOuterBlock(prefab.BodyText);
-            var pattern = new Regex(@"\bflatten\s+(?<name>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;", RegexOptions.Multiline);
+            var pattern = new Regex(
+                @"\b(?:flatten\s+(?<flattenName>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)|(?<memberType>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s+(?<memberName>[A-Za-z_][A-Za-z0-9_]*))\s*;",
+                RegexOptions.Multiline);
 
             foreach (Match match in pattern.Matches(content))
             {
-                var componentName = match.Groups["name"].Value;
-                var componentLocation = module.SourceFile.GetLocation(prefab.BodyStart + 1 + match.Groups["name"].Index);
+                var nameGroup = match.Groups["flattenName"].Success
+                    ? match.Groups["flattenName"]
+                    : match.Groups["memberType"];
+                var componentName = nameGroup.Value;
+                var componentLocation = module.SourceFile.GetLocation(prefab.BodyStart + 1 + nameGroup.Index);
                 var component = model.ResolveComponent(componentName, module);
                 if (component is null)
                 {
@@ -179,7 +184,7 @@ internal sealed class SemanticAnalyzer
                         model.IsAmbiguousComponentName(componentName, module) ? "FLX0404" : "FLX0306",
                         model.IsAmbiguousComponentName(componentName, module)
                             ? $"component name '{componentName}' is ambiguous."
-                            : $"flatten target component '{componentName}' does not exist.",
+                            : $"prefab component '{componentName}' does not exist.",
                         componentLocation);
                     continue;
                 }
@@ -188,7 +193,7 @@ internal sealed class SemanticAnalyzer
             }
 
             if (flattened.Count == 0)
-                _diagnostics.Report("FLX0307", $"prefab '{prefab.Name}' must flatten at least one component.", prefab.Location);
+                _diagnostics.Report("FLX0307", $"prefab '{prefab.Name}' must include at least one component.", prefab.Location);
 
             var duplicateFields = flattened
                 .SelectMany(component => component.Fields)

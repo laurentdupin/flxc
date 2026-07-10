@@ -1,0 +1,5 @@
+build/
+.vs/
+external/
+*.user
+!engine/Engine.vcxproj.user

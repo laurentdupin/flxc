@@ -33,6 +33,10 @@ Build:
 dotnet build .\Flx.VisualStudio.sln -c Debug --no-restore
 ```
 
+Before rebuilding a VSIX that you plan to install, increment the `Identity`
+`Version` in `source.extension.vsixmanifest`. Visual Studio will not install an
+updated extension cleanly when the VSIX identity version is unchanged.
+
 The build publishes `flx-lsp` into `server-bundle\` and creates:
 
 ```text

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="engine/Engine.vcxproj" Id="7a31b2c4-0001-4e8a-9b1d-fab1ec000001" />
+  <Project Path="game/Game.vcxproj" Id="7a31b2c4-0002-4e8a-9b1d-fab1ec000002" />
+  <Project Path="game3d/Tree3D.vcxproj" Id="7a31b2c4-0003-4e8a-9b1d-fab1ec000003" />
+</Solution>

@@ -7,7 +7,7 @@ component AgentData {
 }
 
 prefab Agent {
-    flatten AgentData;
+    AgentData data;
 }
 
 void CreateAgents() {
